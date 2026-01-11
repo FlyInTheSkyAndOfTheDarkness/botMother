@@ -77,6 +77,14 @@
     </div>
 
     <div class="ui horizontal divider">
+        🤖 AI Chatbot
+    </div>
+
+    <div class="ui one column stackable grid cards">
+        <ai-chatbot-config></ai-chatbot-config>
+    </div>
+
+    <div class="ui horizontal divider">
         Send
     </div>
 
@@ -247,6 +255,7 @@
     import ChatList from "{{ .AppBasePath }}/components/ChatList.js";
     import ChatMessages from "{{ .AppBasePath }}/components/ChatMessages.js";
     import DeviceManager from "{{ .AppBasePath }}/components/DeviceManager.js";
+    import AIChatbotConfig from "{{ .AppBasePath }}/components/AIChatbotConfig.js";
 
     const showErrorInfo = (message) => {
         $('body').toast({
@@ -276,7 +285,8 @@
             NewsletterList,
             AccountAvatar, AccountUserInfo, AccountPrivacy, AccountChangeAvatar, AccountContact, AccountChangePushName, AccountUserCheck, AccountBusinessProfile,
             ChatPinManager, ChatDisappearingManager, ChatList, ChatMessages,
-            DeviceManager
+            DeviceManager,
+            AIChatbotConfig
         },
         delimiters: ['[[', ']]'],
         data() {
