@@ -1,0 +1,32 @@
+# binaries
+main
+main.exe
+bin/
+
+# env
+.env
+.env.*
+
+# whatsapp sessions & data
+*.db
+storages/
+history-*.json
+
+# temp
+tmp/
+
+# ide / os
+.idea/
+.vscode/
+.DS_Store
+
+# cursor / ai
+.cursor/
+.playwright-mcp
+.factory
+
+# logs
+*.log
+
+# git internals
+.worktrees/
