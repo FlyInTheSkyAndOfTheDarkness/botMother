@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os"
 	"strings"
-	"regexp"
 
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/config"
 	serp "github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/serp"
@@ -16,7 +15,7 @@ import (
 
 type Service struct {
 	client     *openai.Client
-	serpService *serp.Service
+	serpService *serp.SerpService
 }
 
 func NewService(apiToken string, serpAPIKey string) *Service {
