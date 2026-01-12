@@ -121,6 +121,26 @@ func (m *DeviceManager) RemoveDevice(id string) {
 	}
 }
 
+// LogoutDevice logs out a device without removing its persisted records.
+// This is useful when disconnecting an integration without fully deleting the device.
+func (m *DeviceManager) LogoutDevice(ctx context.Context, deviceID string) error {
+	if deviceID == "" {
+		return fmt.Errorf("device id is required")
+	}
+
+	if inst, ok := m.GetDevice(deviceID); ok && inst != nil {
+		if cli := inst.GetClient(); cli != nil {
+			if err := cli.Logout(ctx); err != nil {
+				logrus.WithError(err).Warnf("[DEVICE_MANAGER] logout failed for device %s", deviceID)
+				return err
+			}
+			cli.Disconnect()
+			logrus.Infof("[DEVICE_MANAGER] device %s logged out successfully", deviceID)
+		}
+	}
+	return nil
+}
+
 // PurgeDevice cleanly logs out a device, removes its persisted records (store/keys),
 // deletes its chatstorage data, and removes it from the in-memory registry.
 func (m *DeviceManager) PurgeDevice(ctx context.Context, deviceID string) error {

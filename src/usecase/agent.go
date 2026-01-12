@@ -166,6 +166,18 @@ func (s *AgentService) HandleIncomingMessage(ctx context.Context, agentID, integ
 		return "", fmt.Errorf("failed to get conversation: %w", err)
 	}
 
+	// Check if in manual mode (manager took over)
+	if conv.IsManualMode {
+		// Store user message but don't generate AI response
+		userMsg := &agent.Message{
+			ConversationID: conv.ID,
+			Role:           "user",
+			Content:        userMessage,
+		}
+		s.repo.AddMessage(ctx, userMsg)
+		return "", nil // Return empty - no AI response in manual mode
+	}
+
 	// Store user message
 	userMsg := &agent.Message{
 		ConversationID: conv.ID,
@@ -315,5 +327,28 @@ func (s *AgentService) GetMessagesForConversation(ctx context.Context, conversat
 // GetLastMessage returns the last message for a conversation
 func (s *AgentService) GetLastMessage(ctx context.Context, conversationID string) (*agent.Message, error) {
 	return s.repo.GetLastMessageForConversation(ctx, conversationID)
+}
+
+// SetConversationManualMode sets manual mode for a conversation (TakeOver/Release)
+func (s *AgentService) SetConversationManualMode(ctx context.Context, conversationID string, isManual bool) error {
+	return s.repo.SetConversationManualMode(ctx, conversationID, isManual)
+}
+
+// UpdateConversationNotes updates notes for a conversation
+func (s *AgentService) UpdateConversationNotes(ctx context.Context, conversationID, notes string) error {
+	return s.repo.UpdateConversationNotes(ctx, conversationID, notes)
+}
+
+// AddManualMessage adds a message sent by manager (not AI)
+func (s *AgentService) AddManualMessage(ctx context.Context, conversationID, content string) (*agent.Message, error) {
+	msg := &agent.Message{
+		ConversationID: conversationID,
+		Role:           "assistant",
+		Content:        content,
+	}
+	if err := s.repo.AddMessage(ctx, msg); err != nil {
+		return nil, err
+	}
+	return msg, nil
 }
 

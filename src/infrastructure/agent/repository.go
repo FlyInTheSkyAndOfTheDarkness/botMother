@@ -60,6 +60,8 @@ func (r *SQLiteRepository) migrate() error {
 			integration_id TEXT NOT NULL,
 			remote_jid TEXT NOT NULL,
 			is_first_reply INTEGER DEFAULT 0,
+			is_manual_mode INTEGER DEFAULT 0,
+			notes TEXT DEFAULT '',
 			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 			FOREIGN KEY (agent_id) REFERENCES agents(id) ON DELETE CASCADE,
@@ -83,6 +85,15 @@ func (r *SQLiteRepository) migrate() error {
 		if _, err := r.db.Exec(query); err != nil {
 			return fmt.Errorf("failed to execute migration: %w", err)
 		}
+	}
+
+	// Safe migrations for existing tables (ignore errors if columns already exist)
+	safeMigrations := []string{
+		`ALTER TABLE conversations ADD COLUMN is_manual_mode INTEGER DEFAULT 0`,
+		`ALTER TABLE conversations ADD COLUMN notes TEXT DEFAULT ''`,
+	}
+	for _, query := range safeMigrations {
+		r.db.Exec(query) // Ignore errors (column may already exist)
 	}
 
 	return nil
@@ -247,10 +258,10 @@ func (r *SQLiteRepository) DeleteIntegration(ctx context.Context, id string) err
 func (r *SQLiteRepository) GetOrCreateConversation(ctx context.Context, agentID, integrationID, remoteJID string) (*agent.Conversation, error) {
 	c := &agent.Conversation{}
 	err := r.db.QueryRowContext(ctx,
-		`SELECT id, agent_id, integration_id, remote_jid, is_first_reply, created_at, updated_at
+		`SELECT id, agent_id, integration_id, remote_jid, is_first_reply, COALESCE(is_manual_mode, 0), COALESCE(notes, ''), created_at, updated_at
 		FROM conversations WHERE agent_id = ? AND integration_id = ? AND remote_jid = ?`,
 		agentID, integrationID, remoteJID,
-	).Scan(&c.ID, &c.AgentID, &c.IntegrationID, &c.RemoteJID, &c.IsFirstReply, &c.CreatedAt, &c.UpdatedAt)
+	).Scan(&c.ID, &c.AgentID, &c.IntegrationID, &c.RemoteJID, &c.IsFirstReply, &c.IsManualMode, &c.Notes, &c.CreatedAt, &c.UpdatedAt)
 
 	if err == sql.ErrNoRows {
 		// Create new conversation
@@ -260,13 +271,15 @@ func (r *SQLiteRepository) GetOrCreateConversation(ctx context.Context, agentID,
 			IntegrationID: integrationID,
 			RemoteJID:     remoteJID,
 			IsFirstReply:  false,
+			IsManualMode:  false,
+			Notes:         "",
 			CreatedAt:     time.Now(),
 			UpdatedAt:     time.Now(),
 		}
 		_, err = r.db.ExecContext(ctx,
-			`INSERT INTO conversations (id, agent_id, integration_id, remote_jid, is_first_reply, created_at, updated_at)
-			VALUES (?, ?, ?, ?, ?, ?, ?)`,
-			c.ID, c.AgentID, c.IntegrationID, c.RemoteJID, c.IsFirstReply, c.CreatedAt, c.UpdatedAt,
+			`INSERT INTO conversations (id, agent_id, integration_id, remote_jid, is_first_reply, is_manual_mode, notes, created_at, updated_at)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			c.ID, c.AgentID, c.IntegrationID, c.RemoteJID, c.IsFirstReply, c.IsManualMode, c.Notes, c.CreatedAt, c.UpdatedAt,
 		)
 		if err != nil {
 			return nil, err
@@ -281,8 +294,8 @@ func (r *SQLiteRepository) GetOrCreateConversation(ctx context.Context, agentID,
 func (r *SQLiteRepository) UpdateConversation(ctx context.Context, c *agent.Conversation) error {
 	c.UpdatedAt = time.Now()
 	_, err := r.db.ExecContext(ctx,
-		`UPDATE conversations SET is_first_reply=?, updated_at=? WHERE id=?`,
-		c.IsFirstReply, c.UpdatedAt, c.ID,
+		`UPDATE conversations SET is_first_reply=?, is_manual_mode=?, notes=?, updated_at=? WHERE id=?`,
+		c.IsFirstReply, c.IsManualMode, c.Notes, c.UpdatedAt, c.ID,
 	)
 	return err
 }
@@ -336,7 +349,7 @@ func (r *SQLiteRepository) GetRecentMessages(ctx context.Context, conversationID
 // GetAllConversations returns all conversations with optional filtering
 func (r *SQLiteRepository) GetAllConversations(ctx context.Context) ([]*agent.Conversation, error) {
 	rows, err := r.db.QueryContext(ctx,
-		`SELECT id, agent_id, integration_id, remote_jid, is_first_reply, created_at, updated_at
+		`SELECT id, agent_id, integration_id, remote_jid, is_first_reply, COALESCE(is_manual_mode, 0), COALESCE(notes, ''), created_at, updated_at
 		FROM conversations ORDER BY updated_at DESC`,
 	)
 	if err != nil {
@@ -347,7 +360,7 @@ func (r *SQLiteRepository) GetAllConversations(ctx context.Context) ([]*agent.Co
 	var conversations []*agent.Conversation
 	for rows.Next() {
 		c := &agent.Conversation{}
-		if err := rows.Scan(&c.ID, &c.AgentID, &c.IntegrationID, &c.RemoteJID, &c.IsFirstReply, &c.CreatedAt, &c.UpdatedAt); err != nil {
+		if err := rows.Scan(&c.ID, &c.AgentID, &c.IntegrationID, &c.RemoteJID, &c.IsFirstReply, &c.IsManualMode, &c.Notes, &c.CreatedAt, &c.UpdatedAt); err != nil {
 			return nil, err
 		}
 		conversations = append(conversations, c)
@@ -359,13 +372,31 @@ func (r *SQLiteRepository) GetAllConversations(ctx context.Context) ([]*agent.Co
 func (r *SQLiteRepository) GetConversationByID(ctx context.Context, id string) (*agent.Conversation, error) {
 	c := &agent.Conversation{}
 	err := r.db.QueryRowContext(ctx,
-		`SELECT id, agent_id, integration_id, remote_jid, is_first_reply, created_at, updated_at
+		`SELECT id, agent_id, integration_id, remote_jid, is_first_reply, COALESCE(is_manual_mode, 0), COALESCE(notes, ''), created_at, updated_at
 		FROM conversations WHERE id = ?`, id,
-	).Scan(&c.ID, &c.AgentID, &c.IntegrationID, &c.RemoteJID, &c.IsFirstReply, &c.CreatedAt, &c.UpdatedAt)
+	).Scan(&c.ID, &c.AgentID, &c.IntegrationID, &c.RemoteJID, &c.IsFirstReply, &c.IsManualMode, &c.Notes, &c.CreatedAt, &c.UpdatedAt)
 	if err != nil {
 		return nil, err
 	}
 	return c, nil
+}
+
+// SetConversationManualMode sets the manual mode for a conversation
+func (r *SQLiteRepository) SetConversationManualMode(ctx context.Context, conversationID string, isManual bool) error {
+	_, err := r.db.ExecContext(ctx,
+		`UPDATE conversations SET is_manual_mode = ?, updated_at = ? WHERE id = ?`,
+		isManual, time.Now(), conversationID,
+	)
+	return err
+}
+
+// UpdateConversationNotes updates the notes for a conversation
+func (r *SQLiteRepository) UpdateConversationNotes(ctx context.Context, conversationID, notes string) error {
+	_, err := r.db.ExecContext(ctx,
+		`UPDATE conversations SET notes = ?, updated_at = ? WHERE id = ?`,
+		notes, time.Now(), conversationID,
+	)
+	return err
 }
 
 // GetMessagesForConversation returns all messages for a conversation

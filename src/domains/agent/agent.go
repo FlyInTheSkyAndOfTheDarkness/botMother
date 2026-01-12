@@ -64,6 +64,8 @@ type Conversation struct {
 	IntegrationID string    `json:"integration_id"`
 	RemoteJID     string    `json:"remote_jid"`      // User identifier (phone, chat_id, etc.)
 	IsFirstReply  bool      `json:"is_first_reply"`  // Whether welcome message was sent
+	IsManualMode  bool      `json:"is_manual_mode"`  // Whether AI is paused (manager takeover)
+	Notes         string    `json:"notes"`           // Manager notes
 	CreatedAt     time.Time `json:"created_at"`
 	UpdatedAt     time.Time `json:"updated_at"`
 }

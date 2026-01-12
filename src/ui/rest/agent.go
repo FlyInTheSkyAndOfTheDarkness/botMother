@@ -296,8 +296,24 @@ func (h *AgentHandler) ConnectIntegration(c *fiber.Ctx) error {
 		}
 
 	case agent.IntegrationTypeInstagram:
-		// Instagram requires OAuth - placeholder
-		return fiber.NewError(fiber.StatusNotImplemented, "Instagram integration not yet implemented")
+		accessToken, _ := configBody["access_token"].(string)
+		pageID, _ := configBody["page_id"].(string)
+		if accessToken == "" || pageID == "" {
+			return fiber.NewError(fiber.StatusBadRequest, "access_token and page_id are required for Instagram")
+		}
+
+		// Update integration config
+		config := agent.InstagramConfig{
+			AccessToken: accessToken,
+			PageID:      pageID,
+		}
+		configJSON, _ := json.Marshal(config)
+		
+		if err := h.Service.UpdateIntegrationConfig(c.UserContext(), integrationID, string(configJSON), true); err != nil {
+			return fiber.NewError(fiber.StatusInternalServerError, err.Error())
+		}
+		// Note: Instagram messaging requires webhook setup for receiving messages
+		// For now, we just save the credentials
 	}
 
 	return c.JSON(utils.ResponseData{
@@ -321,13 +337,22 @@ func (h *AgentHandler) DisconnectIntegration(c *fiber.Ctx) error {
 	}
 
 	// Stop services based on type
-	if integration.Type == agent.IntegrationTypeTelegram {
+	switch integration.Type {
+	case agent.IntegrationTypeTelegram:
 		if botMgr := telegramBot.GetBotManager(); botMgr != nil {
 			botMgr.StopBot(integrationID)
 		}
+	case agent.IntegrationTypeWhatsApp:
+		// Logout WhatsApp device
+		var waConfig agent.WhatsAppConfig
+		if err := json.Unmarshal([]byte(integration.Config), &waConfig); err == nil && waConfig.DeviceID != "" {
+			if dm := whatsapp.GetDeviceManager(); dm != nil {
+				dm.LogoutDevice(c.UserContext(), waConfig.DeviceID)
+			}
+		}
 	}
 
-	// Update integration status
+	// Update integration status to disconnected
 	if err := h.Service.UpdateIntegrationConfig(c.UserContext(), integrationID, integration.Config, false); err != nil {
 		return fiber.NewError(fiber.StatusInternalServerError, err.Error())
 	}

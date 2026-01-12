@@ -139,15 +139,17 @@ const LiveChat = {
             </div>
 
             <div class="mt-6 pt-4 border-t border-dark-border">
+                <h3 class="text-sm font-semibold text-dark-muted uppercase tracking-wider mb-3">Notes</h3>
+                <textarea v-model="conversationNotes" 
+                          @blur="saveNotes"
+                          placeholder="Add notes about this conversation..."
+                          class="w-full px-3 py-2 bg-dark-bg border border-dark-border rounded-lg text-white text-sm resize-none h-24 focus:border-primary-500 focus:outline-none"></textarea>
+            </div>
+
+            <div class="mt-4 pt-4 border-t border-dark-border">
                 <h3 class="text-sm font-semibold text-dark-muted uppercase tracking-wider mb-3">Quick Actions</h3>
                 <div class="space-y-2">
-                    <button class="w-full px-3 py-2 bg-dark-bg hover:bg-dark-border text-white text-sm rounded-lg transition-colors text-left">
-                        📋 Add Note
-                    </button>
-                    <button class="w-full px-3 py-2 bg-dark-bg hover:bg-dark-border text-white text-sm rounded-lg transition-colors text-left">
-                        🏷️ Add Tag
-                    </button>
-                    <button class="w-full px-3 py-2 bg-dark-bg hover:bg-dark-border text-white text-sm rounded-lg transition-colors text-left">
+                    <button @click="exportChat" class="w-full px-3 py-2 bg-dark-bg hover:bg-dark-border text-white text-sm rounded-lg transition-colors text-left">
                         📤 Export Chat
                     </button>
                 </div>
@@ -167,6 +169,7 @@ const LiveChat = {
         const sending = ref(false);
         const isManualMode = ref(false);
         const messagesContainer = ref(null);
+        const conversationNotes = ref('');
 
         const filteredConversations = computed(() => {
             if (!searchQuery.value) return conversations.value;
@@ -193,6 +196,8 @@ const LiveChat = {
 
         const selectConversation = async (conv) => {
             selectedConversation.value = conv;
+            isManualMode.value = conv.is_manual_mode || false;
+            conversationNotes.value = conv.notes || '';
             await loadMessages(conv.id);
         };
 
@@ -232,14 +237,44 @@ const LiveChat = {
             }
         };
 
-        const takeOver = () => {
-            isManualMode.value = true;
-            // TODO: API call to pause AI for this conversation
+        const takeOver = async () => {
+            if (!selectedConversation.value) return;
+            try {
+                await axios.post(`/api/conversations/${selectedConversation.value.id}/takeover`);
+                isManualMode.value = true;
+                selectedConversation.value.is_manual_mode = true;
+            } catch (error) {
+                console.error('Failed to take over conversation:', error);
+            }
         };
 
-        const releaseControl = () => {
-            isManualMode.value = false;
-            // TODO: API call to resume AI for this conversation
+        const releaseControl = async () => {
+            if (!selectedConversation.value) return;
+            try {
+                await axios.post(`/api/conversations/${selectedConversation.value.id}/release`);
+                isManualMode.value = false;
+                selectedConversation.value.is_manual_mode = false;
+            } catch (error) {
+                console.error('Failed to release conversation:', error);
+            }
+        };
+
+        const saveNotes = async () => {
+            if (!selectedConversation.value) return;
+            try {
+                await axios.post(`/api/conversations/${selectedConversation.value.id}/notes`, {
+                    notes: conversationNotes.value
+                });
+                selectedConversation.value.notes = conversationNotes.value;
+            } catch (error) {
+                console.error('Failed to save notes:', error);
+            }
+        };
+
+        const exportChat = () => {
+            if (!selectedConversation.value) return;
+            // Download CSV file
+            window.open(`/api/conversations/${selectedConversation.value.id}/export`, '_blank');
         };
 
         const formatJID = (jid) => {
@@ -281,10 +316,10 @@ const LiveChat = {
 
         return {
             conversations, selectedConversation, messages, searchQuery,
-            newMessage, sending, isManualMode, messagesContainer,
+            newMessage, sending, isManualMode, messagesContainer, conversationNotes,
             filteredConversations,
             loadConversations, selectConversation, sendMessage,
-            takeOver, releaseControl,
+            takeOver, releaseControl, saveNotes, exportChat,
             formatJID, formatTime, formatMessageTime, formatDate
         };
     }
