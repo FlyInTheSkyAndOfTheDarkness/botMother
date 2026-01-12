@@ -56,17 +56,23 @@ func (s *Service) GenerateResponse(ctx context.Context, userMessage string, syst
 	// Check if user is asking for current/real-time information
 	needsSearch := s.needsInternetSearch(userMessage)
 	var searchResults string
-	if needsSearch && s.serpService != nil {
-		// Extract search query from user message
-		searchQuery := s.extractSearchQuery(userMessage)
-		if searchQuery != "" {
-			results, err := s.serpService.Search(searchQuery)
-			if err == nil {
-				searchResults = results
-				// Add search results to user message
-				userMessage = fmt.Sprintf("User question: %s\n\nSearch results from internet:\n%s\n\nPlease answer based on the search results above.", userMessage, searchResults)
-			} else {
-				logrus.Warnf("SerpAPI search failed: %v", err)
+	if needsSearch {
+		if s.serpService == nil {
+			logrus.Debugf("SerpAPI service not available (no API key configured)")
+		} else {
+			// Extract search query from user message
+			searchQuery := s.extractSearchQuery(userMessage)
+			if searchQuery != "" {
+				logrus.Infof("Searching internet for: %s", searchQuery)
+				results, err := s.serpService.Search(searchQuery)
+				if err == nil {
+					searchResults = results
+					logrus.Infof("SerpAPI search successful, results length: %d", len(searchResults))
+					// Add search results to user message
+					userMessage = fmt.Sprintf("User question: %s\n\nSearch results from internet:\n%s\n\nPlease answer based on the search results above.", userMessage, searchResults)
+				} else {
+					logrus.Warnf("SerpAPI search failed: %v", err)
+				}
 			}
 		}
 	}
@@ -137,13 +143,15 @@ func (s *Service) needsInternetSearch(message string) bool {
 		"сегодня", "today", "сейчас", "now", "текущ", "current",
 		"погода", "weather", "курс", "rate", "exchange",
 		"новости", "news", "актуальн", "latest", "recent",
-		"дата", "date", "время", "time", "какое число", "what date",
+		"дата", "date", "время", "time", "какое число", "what date", "какая дата", "какой день",
 		"сколько", "how much", "цена", "price", "стоимость", "cost",
+		"какой сегодня", "what is today", "какое сегодня", "what today",
 	}
 	
 	lowerMsg := strings.ToLower(message)
 	for _, keyword := range keywords {
 		if strings.Contains(lowerMsg, keyword) {
+			logrus.Debugf("Message requires internet search (keyword: %s): %s", keyword, message)
 			return true
 		}
 	}

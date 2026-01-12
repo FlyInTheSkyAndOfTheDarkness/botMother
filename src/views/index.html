@@ -328,10 +328,13 @@
                             <label class="block text-sm font-medium text-dark-text mb-2">
                                 SerpAPI Key (Optional)
                                 <span class="text-xs text-dark-muted font-normal">for internet access</span>
+                                <span v-if="!isCreating && selectedAgent?.serp_api_key_masked" class="text-xs text-green-400 font-normal ml-2">
+                                    (saved: [[ selectedAgent.serp_api_key_masked ]])
+                                </span>
                             </label>
                             <input v-model="form.serp_api_key" type="password"
                                    class="w-full px-4 py-3 bg-dark-bg border border-dark-border rounded-xl text-white font-mono placeholder-dark-muted focus:border-primary-500 focus:outline-none transition-colors"
-                                   placeholder="Your SerpAPI key (optional)">
+                                   :placeholder="!isCreating && selectedAgent?.serp_api_key_masked ? 'Leave empty to keep current key' : 'Your SerpAPI key (optional)'">
                             <p class="text-xs text-dark-muted mt-1">Get your key from <a href="https://serpapi.com/" target="_blank" class="text-primary-400 hover:underline">serpapi.com</a></p>
                         </div>
 
@@ -742,8 +745,12 @@
                             showToast('Agent created successfully');
                         } else {
                             const updateData = { ...form };
+                            // Don't send empty keys - they would overwrite existing values
                             if (updateData.api_key === '') {
                                 delete updateData.api_key;
+                            }
+                            if (updateData.serp_api_key === '') {
+                                delete updateData.serp_api_key;
                             }
                             await axios.put(`/api/agents/${selectedAgent.value.id}`, updateData);
                             showToast('Agent updated successfully');

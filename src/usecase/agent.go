@@ -215,6 +215,13 @@ func (s *AgentService) HandleIncomingMessage(ctx context.Context, agentID, integ
 		if aiSvc == nil {
 			return "", fmt.Errorf("failed to initialize AI service")
 		}
+		
+		// Log SerpAPI availability
+		if a.SerpAPIKey != "" {
+			fmt.Printf("[AgentService] SerpAPI key configured for agent %s (length: %d)\n", a.ID, len(a.SerpAPIKey))
+		} else {
+			fmt.Printf("[AgentService] No SerpAPI key for agent %s\n", a.ID)
+		}
 
 		// Get recent messages for context (limited to 5 for efficiency)
 		recentMessages, err := s.repo.GetRecentMessages(ctx, conv.ID, 5)
