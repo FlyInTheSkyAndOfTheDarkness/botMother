@@ -400,7 +400,7 @@ func initApp() {
 	} else {
 		agentService = usecase.NewAgentService(agentRepository)
 		// Initialize WhatsApp message handler for agents
-		whatsapp.InitAgentHandler(agentRepository)
+		whatsapp.InitAgentHandler(agentRepository, agentUsecase)
 		logrus.Info("Agent service initialized successfully")
 		
 		// Initialize Telegram bot manager

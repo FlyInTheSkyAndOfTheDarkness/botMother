@@ -11,6 +11,8 @@ import (
 	aiService "github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/ai"
 	domainChatStorage "github.com/aldinokemal/go-whatsapp-web-multidevice/domains/chatstorage"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/pkg/utils"
+	"github.com/aldinokemal/go-whatsapp-web-multidevice/usecase"
+	"github.com/sirupsen/logrus"
 	"go.mau.fi/whatsmeow"
 	"go.mau.fi/whatsmeow/proto/waE2E"
 	"go.mau.fi/whatsmeow/types"
@@ -20,8 +22,9 @@ import (
 
 // AgentMessageHandler handles incoming messages for agents with WhatsApp integrations
 type AgentMessageHandler struct {
-	agentRepo *agentRepo.SQLiteRepository
-	mu        sync.RWMutex
+	agentRepo    *agentRepo.SQLiteRepository
+	agentService *usecase.AgentService
+	mu           sync.RWMutex
 }
 
 var (
@@ -30,13 +33,14 @@ var (
 )
 
 // InitAgentHandler initializes the global agent message handler
-func InitAgentHandler(repo *agentRepo.SQLiteRepository) {
+func InitAgentHandler(repo *agentRepo.SQLiteRepository, agentSvc *usecase.AgentService) {
 	agentHandlerOnce.Do(func() {
-		if repo != nil {
+		if repo != nil && agentSvc != nil {
 			agentHandler = &AgentMessageHandler{
-				agentRepo: repo,
+				agentRepo:    repo,
+				agentService: agentSvc,
 			}
-			log.Infof("Agent message handler initialized")
+			logrus.Infof("Agent message handler initialized")
 		}
 	})
 }
@@ -90,7 +94,7 @@ func (h *AgentMessageHandler) HandleIncomingMessage(
 	// Find agents with active WhatsApp integrations matching this device
 	agents, err := h.agentRepo.GetAll(ctx)
 	if err != nil {
-		log.Errorf("Failed to get agents: %v", err)
+		logrus.Errorf("Failed to get agents: %v", err)
 		return
 	}
 
@@ -173,13 +177,13 @@ func (h *AgentMessageHandler) extractMessage(ctx context.Context, evt *events.Me
 	} else if audioMsg := innerMsg.GetAudioMessage(); audioMsg != nil {
 		// Handle audio messages - transcribe them
 		if !config.WhatsappAutoDownloadMedia {
-			log.Warnf("Agent received audio message but auto-download-media is disabled")
+			logrus.Warnf("Agent received audio message but auto-download-media is disabled")
 			return ""
 		}
 
 		extractedMedia, err := utils.ExtractMedia(ctx, client, config.PathMedia, audioMsg)
 		if err != nil {
-			log.Errorf("Failed to download audio for transcription: %v", err)
+			logrus.Errorf("Failed to download audio for transcription: %v", err)
 			return ""
 		}
 
@@ -199,100 +203,36 @@ func (h *AgentMessageHandler) processMessageForAgent(
 	chatStorageRepo domainChatStorage.IChatStorageRepository,
 	client *whatsmeow.Client,
 ) {
-	// Create AI service with agent's API key
-	aiSvc := aiService.NewService(ag.APIKey)
-	if aiSvc == nil {
-		log.Errorf("Failed to create AI service for agent %s", ag.ID)
+	if h.agentService == nil {
+		logrus.Error("Agent service not initialized")
 		return
 	}
 
 	// Handle audio transcription if needed
 	if strings.HasPrefix(userMessage, "[AUDIO:") && strings.HasSuffix(userMessage, "]") {
 		audioPath := userMessage[7 : len(userMessage)-1]
-		transcription, err := aiSvc.TranscribeAudio(ctx, audioPath)
-		if err != nil {
-			log.Errorf("Failed to transcribe audio for agent %s: %v", ag.ID, err)
-			return
-		}
-		userMessage = transcription
-		log.Infof("Agent %s transcribed audio: %s", ag.ID, userMessage)
-	}
-
-	// Get or create conversation
-	conv, err := h.agentRepo.GetOrCreateConversation(ctx, ag.ID, integration.ID, remoteJID)
-	if err != nil {
-		log.Errorf("Failed to get conversation for agent %s: %v", ag.ID, err)
-		return
-	}
-
-	// Store user message
-	userMsg := &agent.Message{
-		ConversationID: conv.ID,
-		Role:           "user",
-		Content:        userMessage,
-	}
-	if err := h.agentRepo.AddMessage(ctx, userMsg); err != nil {
-		log.Errorf("Failed to store user message: %v", err)
-	}
-
-	var response string
-
-	// Check if this is the first reply - send welcome message
-	if !conv.IsFirstReply && ag.WelcomeMessage != "" {
-		response = ag.WelcomeMessage
-		conv.IsFirstReply = true
-		if err := h.agentRepo.UpdateConversation(ctx, conv); err != nil {
-			log.Errorf("Failed to update conversation: %v", err)
-		}
-	} else {
-		// Get recent messages for context
-		recentMessages, err := h.agentRepo.GetRecentMessages(ctx, conv.ID, 10)
-		if err != nil {
-			log.Errorf("Failed to get recent messages: %v", err)
-		}
-
-		// Build context from recent messages
-		var contextBuilder strings.Builder
-		for _, msg := range recentMessages {
-			if msg.Role == "user" {
-				contextBuilder.WriteString("User: " + msg.Content + "\n")
-			} else if msg.Role == "assistant" {
-				contextBuilder.WriteString("Assistant: " + msg.Content + "\n")
+		aiSvc := aiService.NewService(ag.APIKey, ag.SerpAPIKey)
+		if aiSvc != nil {
+			transcription, err := aiSvc.TranscribeAudio(ctx, audioPath)
+			if err != nil {
+				logrus.Errorf("Failed to transcribe audio for agent %s: %v", ag.ID, err)
+				return
 			}
+			userMessage = transcription
+			logrus.Infof("Agent %s transcribed audio: %s", ag.ID, userMessage)
 		}
+	}
 
-		// If we have context, include it in the prompt
-		finalPrompt := userMessage
-		if contextBuilder.Len() > 0 {
-			finalPrompt = "Previous conversation:\n" + contextBuilder.String() + "\nCurrent message: " + userMessage
-		}
-
-		response, err = aiSvc.GenerateResponse(ctx, finalPrompt, ag.SystemPrompt, ag.Model)
-		if err != nil {
-			log.Errorf("Failed to generate AI response for agent %s: %v", ag.ID, err)
-			return
-		}
-
-		// Mark conversation as having had first reply
-		if !conv.IsFirstReply {
-			conv.IsFirstReply = true
-			h.agentRepo.UpdateConversation(ctx, conv)
-		}
+	// Use AgentService to handle the message (same as Telegram)
+	response, err := h.agentService.HandleIncomingMessage(ctx, ag.ID, integration.ID, remoteJID, userMessage)
+	if err != nil {
+		logrus.Errorf("Failed to get AI response for agent %s: %v", ag.ID, err)
+		return
 	}
 
 	if response == "" {
-		log.Warnf("Agent %s: AI returned empty response", ag.ID)
+		logrus.Warnf("Agent %s: AI returned empty response (manual mode or error)", ag.ID)
 		return
-	}
-
-	// Store assistant response
-	assistantMsg := &agent.Message{
-		ConversationID: conv.ID,
-		Role:           "assistant",
-		Content:        response,
-	}
-	if err := h.agentRepo.AddMessage(ctx, assistantMsg); err != nil {
-		log.Errorf("Failed to store assistant message: %v", err)
 	}
 
 	// Send the response via WhatsApp
@@ -304,7 +244,7 @@ func (h *AgentMessageHandler) processMessageForAgent(
 	)
 
 	if err != nil {
-		log.Errorf("Failed to send agent %s response: %v", ag.ID, err)
+		logrus.Errorf("Failed to send agent %s response: %v", ag.ID, err)
 		return
 	}
 
@@ -323,10 +263,10 @@ func (h *AgentMessageHandler) processMessageForAgent(
 			response,
 			sendResp.Timestamp,
 		); err != nil {
-			log.Errorf("Failed to store agent response in chat storage: %v", err)
+			logrus.Errorf("Failed to store agent response in chat storage: %v", err)
 		}
 	}
 
-	log.Infof("Agent %s sent response to %s", ag.Name, remoteJID)
+	logrus.Infof("Agent %s sent response to %s", ag.Name, remoteJID)
 }
 

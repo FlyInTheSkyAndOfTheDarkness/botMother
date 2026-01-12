@@ -6,23 +6,30 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"regexp"
 
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/config"
+	serp "github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/serp"
 	"github.com/sashabaranov/go-openai"
 	"github.com/sirupsen/logrus"
 )
 
 type Service struct {
-	client *openai.Client
+	client     *openai.Client
+	serpService *serp.Service
 }
 
-func NewService(apiToken string) *Service {
+func NewService(apiToken string, serpAPIKey string) *Service {
 	if apiToken == "" {
 		return nil
 	}
-	return &Service{
+	s := &Service{
 		client: openai.NewClient(apiToken),
 	}
+	if serpAPIKey != "" {
+		s.serpService = serp.NewService(serpAPIKey)
+	}
+	return s
 }
 
 // GenerateResponse generates an AI response for the given user message
@@ -45,6 +52,24 @@ func (s *Service) GenerateResponse(ctx context.Context, userMessage string, syst
 	}
 	if systemPrompt == "" {
 		systemPrompt = "You are a helpful assistant. Respond concisely and helpfully to user messages."
+	}
+
+	// Check if user is asking for current/real-time information
+	needsSearch := s.needsInternetSearch(userMessage)
+	var searchResults string
+	if needsSearch && s.serpService != nil {
+		// Extract search query from user message
+		searchQuery := s.extractSearchQuery(userMessage)
+		if searchQuery != "" {
+			results, err := s.serpService.Search(searchQuery)
+			if err == nil {
+				searchResults = results
+				// Add search results to user message
+				userMessage = fmt.Sprintf("User question: %s\n\nSearch results from internet:\n%s\n\nPlease answer based on the search results above.", userMessage, searchResults)
+			} else {
+				logrus.Warnf("SerpAPI search failed: %v", err)
+			}
+		}
 	}
 
 	req := openai.ChatCompletionRequest{
@@ -104,6 +129,46 @@ func (s *Service) TranscribeAudio(ctx context.Context, audioPath string) (string
 	}
 
 	return strings.TrimSpace(transcription.Text), nil
+}
+
+// needsInternetSearch checks if the user message requires internet search
+func (s *Service) needsInternetSearch(message string) bool {
+	// Keywords that indicate need for current information
+	keywords := []string{
+		"сегодня", "today", "сейчас", "now", "текущ", "current",
+		"погода", "weather", "курс", "rate", "exchange",
+		"новости", "news", "актуальн", "latest", "recent",
+		"дата", "date", "время", "time", "какое число", "what date",
+		"сколько", "how much", "цена", "price", "стоимость", "cost",
+	}
+	
+	lowerMsg := strings.ToLower(message)
+	for _, keyword := range keywords {
+		if strings.Contains(lowerMsg, keyword) {
+			return true
+		}
+	}
+	return false
+}
+
+// extractSearchQuery extracts a search query from the user message
+func (s *Service) extractSearchQuery(message string) string {
+	// Remove common question words and clean up
+	query := strings.TrimSpace(message)
+	
+	// Remove question marks and common prefixes
+	query = strings.TrimRight(query, "?")
+	
+	// Remove common question words at the start
+	questionWords := []string{"какая", "какой", "какое", "какие", "как", "what", "when", "where", "who", "how"}
+	for _, word := range questionWords {
+		if strings.HasPrefix(strings.ToLower(query), word+" ") {
+			query = strings.TrimPrefix(query, word+" ")
+			break
+		}
+	}
+	
+	return strings.TrimSpace(query)
 }
 
 // TranscribeAudioFromBytes transcribes audio from bytes using OpenAI Whisper API

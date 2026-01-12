@@ -19,7 +19,7 @@ var aiServiceInstance *aiService.Service
 
 func initAIService() {
 	if config.AIChatbotEnabled && config.AIChatbotAPIToken != "" {
-		aiServiceInstance = aiService.NewService(config.AIChatbotAPIToken)
+		aiServiceInstance = aiService.NewService(config.AIChatbotAPIToken, "") // Legacy chatbot doesn't use SerpAPI
 	} else {
 		aiServiceInstance = nil
 	}
@@ -29,7 +29,7 @@ func getAIService() *aiService.Service {
 	// Reinitialize if config changed
 	if config.AIChatbotEnabled && config.AIChatbotAPIToken != "" {
 		if aiServiceInstance == nil {
-			aiServiceInstance = aiService.NewService(config.AIChatbotAPIToken)
+			aiServiceInstance = aiService.NewService(config.AIChatbotAPIToken, "") // Legacy chatbot doesn't use SerpAPI
 		}
 		return aiServiceInstance
 	}

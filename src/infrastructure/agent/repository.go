@@ -37,6 +37,7 @@ func (r *SQLiteRepository) migrate() error {
 			name TEXT NOT NULL,
 			description TEXT DEFAULT '',
 			api_key TEXT NOT NULL,
+			serp_api_key TEXT DEFAULT '',
 			model TEXT NOT NULL DEFAULT 'gpt-4o-mini',
 			system_prompt TEXT NOT NULL,
 			welcome_message TEXT DEFAULT '',
@@ -44,6 +45,8 @@ func (r *SQLiteRepository) migrate() error {
 			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 		)`,
+		// Migration for existing tables
+		`ALTER TABLE agents ADD COLUMN serp_api_key TEXT DEFAULT ''`,
 		`CREATE TABLE IF NOT EXISTS integrations (
 			id TEXT PRIMARY KEY,
 			agent_id TEXT NOT NULL,
@@ -114,9 +117,9 @@ func (r *SQLiteRepository) Create(ctx context.Context, a *agent.Agent) error {
 	a.UpdatedAt = now
 
 	_, err := r.db.ExecContext(ctx,
-		`INSERT INTO agents (id, name, description, api_key, model, system_prompt, welcome_message, is_active, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		a.ID, a.Name, a.Description, a.APIKey, a.Model, a.SystemPrompt, a.WelcomeMessage, a.IsActive, a.CreatedAt, a.UpdatedAt,
+		`INSERT INTO agents (id, name, description, api_key, serp_api_key, model, system_prompt, welcome_message, is_active, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		a.ID, a.Name, a.Description, a.APIKey, a.SerpAPIKey, a.Model, a.SystemPrompt, a.WelcomeMessage, a.IsActive, a.CreatedAt, a.UpdatedAt,
 	)
 	return err
 }
@@ -124,9 +127,9 @@ func (r *SQLiteRepository) Create(ctx context.Context, a *agent.Agent) error {
 func (r *SQLiteRepository) GetByID(ctx context.Context, id string) (*agent.Agent, error) {
 	a := &agent.Agent{}
 	err := r.db.QueryRowContext(ctx,
-		`SELECT id, name, description, api_key, model, system_prompt, welcome_message, is_active, created_at, updated_at
+		`SELECT id, name, description, api_key, COALESCE(serp_api_key, ''), model, system_prompt, welcome_message, is_active, created_at, updated_at
 		FROM agents WHERE id = ?`, id,
-	).Scan(&a.ID, &a.Name, &a.Description, &a.APIKey, &a.Model, &a.SystemPrompt, &a.WelcomeMessage, &a.IsActive, &a.CreatedAt, &a.UpdatedAt)
+	).Scan(&a.ID, &a.Name, &a.Description, &a.APIKey, &a.SerpAPIKey, &a.Model, &a.SystemPrompt, &a.WelcomeMessage, &a.IsActive, &a.CreatedAt, &a.UpdatedAt)
 
 	if err == sql.ErrNoRows {
 		return nil, fmt.Errorf("agent not found")
@@ -136,7 +139,7 @@ func (r *SQLiteRepository) GetByID(ctx context.Context, id string) (*agent.Agent
 
 func (r *SQLiteRepository) GetAll(ctx context.Context) ([]*agent.Agent, error) {
 	rows, err := r.db.QueryContext(ctx,
-		`SELECT id, name, description, api_key, model, system_prompt, welcome_message, is_active, created_at, updated_at
+		`SELECT id, name, description, api_key, COALESCE(serp_api_key, ''), model, system_prompt, welcome_message, is_active, created_at, updated_at
 		FROM agents ORDER BY created_at DESC`,
 	)
 	if err != nil {
@@ -147,7 +150,7 @@ func (r *SQLiteRepository) GetAll(ctx context.Context) ([]*agent.Agent, error) {
 	var agents []*agent.Agent
 	for rows.Next() {
 		a := &agent.Agent{}
-		if err := rows.Scan(&a.ID, &a.Name, &a.Description, &a.APIKey, &a.Model, &a.SystemPrompt, &a.WelcomeMessage, &a.IsActive, &a.CreatedAt, &a.UpdatedAt); err != nil {
+		if err := rows.Scan(&a.ID, &a.Name, &a.Description, &a.APIKey, &a.SerpAPIKey, &a.Model, &a.SystemPrompt, &a.WelcomeMessage, &a.IsActive, &a.CreatedAt, &a.UpdatedAt); err != nil {
 			return nil, err
 		}
 		agents = append(agents, a)
@@ -158,9 +161,9 @@ func (r *SQLiteRepository) GetAll(ctx context.Context) ([]*agent.Agent, error) {
 func (r *SQLiteRepository) Update(ctx context.Context, a *agent.Agent) error {
 	a.UpdatedAt = time.Now()
 	_, err := r.db.ExecContext(ctx,
-		`UPDATE agents SET name=?, description=?, api_key=?, model=?, system_prompt=?, welcome_message=?, is_active=?, updated_at=?
+		`UPDATE agents SET name=?, description=?, api_key=?, serp_api_key=?, model=?, system_prompt=?, welcome_message=?, is_active=?, updated_at=?
 		WHERE id=?`,
-		a.Name, a.Description, a.APIKey, a.Model, a.SystemPrompt, a.WelcomeMessage, a.IsActive, a.UpdatedAt, a.ID,
+		a.Name, a.Description, a.APIKey, a.SerpAPIKey, a.Model, a.SystemPrompt, a.WelcomeMessage, a.IsActive, a.UpdatedAt, a.ID,
 	)
 	return err
 }

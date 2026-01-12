@@ -11,6 +11,7 @@ type Agent struct {
 	Name           string    `json:"name"`
 	Description    string    `json:"description,omitempty"`
 	APIKey         string    `json:"api_key"`          // OpenAI API key
+	SerpAPIKey     string    `json:"serp_api_key"`    // SerpAPI key for internet access
 	Model          string    `json:"model"`            // gpt-4o-mini, gpt-4o, etc.
 	SystemPrompt   string    `json:"system_prompt"`    // AI behavior instructions
 	WelcomeMessage string    `json:"welcome_message"`  // First response template
@@ -84,6 +85,7 @@ type CreateAgentRequest struct {
 	Name           string `json:"name" validate:"required,min=1,max=100"`
 	Description    string `json:"description,omitempty"`
 	APIKey         string `json:"api_key" validate:"required"`
+	SerpAPIKey     string `json:"serp_api_key,omitempty"` // Optional SerpAPI key
 	Model          string `json:"model" validate:"required"`
 	SystemPrompt   string `json:"system_prompt" validate:"required"`
 	WelcomeMessage string `json:"welcome_message,omitempty"`
@@ -94,6 +96,7 @@ type UpdateAgentRequest struct {
 	Name           *string `json:"name,omitempty"`
 	Description    *string `json:"description,omitempty"`
 	APIKey         *string `json:"api_key,omitempty"`
+	SerpAPIKey     *string `json:"serp_api_key,omitempty"`
 	Model          *string `json:"model,omitempty"`
 	SystemPrompt   *string `json:"system_prompt,omitempty"`
 	WelcomeMessage *string `json:"welcome_message,omitempty"`
@@ -106,6 +109,7 @@ type AgentResponse struct {
 	Name           string                `json:"name"`
 	Description    string                `json:"description"`
 	APIKeyMasked   string                `json:"api_key_masked"` // sk-...xxxx
+	SerpAPIKeyMasked string              `json:"serp_api_key_masked,omitempty"` // SerpAPI key masked
 	Model          string                `json:"model"`
 	SystemPrompt   string                `json:"system_prompt"`
 	WelcomeMessage string                `json:"welcome_message"`

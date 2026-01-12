@@ -30,6 +30,7 @@ func (s *AgentService) CreateAgent(ctx context.Context, req agent.CreateAgentReq
 		Name:           req.Name,
 		Description:    req.Description,
 		APIKey:         req.APIKey,
+		SerpAPIKey:     req.SerpAPIKey,
 		Model:          req.Model,
 		SystemPrompt:   req.SystemPrompt,
 		WelcomeMessage: req.WelcomeMessage,
@@ -89,6 +90,9 @@ func (s *AgentService) UpdateAgent(ctx context.Context, id string, req agent.Upd
 	if req.APIKey != nil {
 		a.APIKey = *req.APIKey
 	}
+	if req.SerpAPIKey != nil {
+		a.SerpAPIKey = *req.SerpAPIKey
+	}
 	if req.Model != nil {
 		a.Model = *req.Model
 	}
@@ -133,7 +137,7 @@ func (s *AgentService) agentToResponse(ctx context.Context, a *agent.Agent) (*ag
 		})
 	}
 
-	return &agent.AgentResponse{
+	resp := &agent.AgentResponse{
 		ID:             a.ID,
 		Name:           a.Name,
 		Description:    a.Description,
@@ -145,7 +149,11 @@ func (s *AgentService) agentToResponse(ctx context.Context, a *agent.Agent) (*ag
 		Integrations:   integrationResponses,
 		CreatedAt:      a.CreatedAt,
 		UpdatedAt:      a.UpdatedAt,
-	}, nil
+	}
+	if a.SerpAPIKey != "" {
+		resp.SerpAPIKeyMasked = maskAPIKey(a.SerpAPIKey)
+	}
+	return resp, nil
 }
 
 // HandleIncomingMessage processes an incoming message and generates AI response
@@ -203,7 +211,7 @@ func (s *AgentService) HandleIncomingMessage(ctx context.Context, agentID, integ
 		}
 	} else {
 		// Generate AI response
-		aiSvc := aiService.NewService(a.APIKey)
+		aiSvc := aiService.NewService(a.APIKey, a.SerpAPIKey)
 		if aiSvc == nil {
 			return "", fmt.Errorf("failed to initialize AI service")
 		}
