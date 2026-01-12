@@ -253,8 +253,12 @@ func (h *AgentHandler) ConnectIntegration(c *fiber.Ctx) error {
 		}
 
 	case agent.IntegrationTypeWhatsApp:
-		// WhatsApp connection handled separately via QR
-		if err := h.Service.UpdateIntegrationConfig(c.UserContext(), integrationID, integration.Config, true); err != nil {
+		// WhatsApp connection - save device_id
+		deviceID, _ := configBody["device_id"].(string)
+		config := agent.WhatsAppConfig{DeviceID: deviceID}
+		configJSON, _ := json.Marshal(config)
+		
+		if err := h.Service.UpdateIntegrationConfig(c.UserContext(), integrationID, string(configJSON), true); err != nil {
 			return fiber.NewError(fiber.StatusInternalServerError, err.Error())
 		}
 
