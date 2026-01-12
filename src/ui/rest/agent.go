@@ -127,6 +127,31 @@ func (h *AgentHandler) UpdateAgent(c *fiber.Ctx) error {
 		return fiber.NewError(fiber.StatusInternalServerError, err.Error())
 	}
 
+	// Handle Telegram bot start/stop based on agent active status
+	if req.IsActive != nil {
+		botMgr := telegramBot.GetBotManager()
+		if botMgr != nil {
+			// Get all integrations for this agent
+			for _, integration := range result.Integrations {
+				if integration.Type == agent.IntegrationTypeTelegram && integration.IsConnected {
+					if *req.IsActive {
+						// Agent activated - start the bot
+						fullIntegration, err := h.Service.GetIntegration(c.UserContext(), integration.ID)
+						if err == nil {
+							var config agent.TelegramConfig
+							if json.Unmarshal([]byte(fullIntegration.Config), &config) == nil && config.BotToken != "" {
+								botMgr.StartBot(integration.ID, id, config.BotToken)
+							}
+						}
+					} else {
+						// Agent deactivated - stop the bot
+						botMgr.StopBot(integration.ID)
+					}
+				}
+			}
+		}
+	}
+
 	return c.JSON(utils.ResponseData{
 		Status:  200,
 		Code:    "SUCCESS",
