@@ -117,6 +117,9 @@ func restServer(_ *cobra.Command, _ []string) {
 	// Initialize Agent routes (no device required - platform-level)
 	if agentService != nil {
 		rest.InitRestAgent(platformAPI, agentService, appUsecase)
+		logrus.Info("Agent routes registered at /api/agents")
+	} else {
+		logrus.Warn("Agent service is nil - agent routes will not be available")
 	}
 	
 	// Initialize Flow routes (no device required - platform-level)
