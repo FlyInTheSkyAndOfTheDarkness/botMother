@@ -96,6 +96,9 @@ func restServer(_ *cobra.Command, _ []string) {
 	if config.AppBasePath != "" {
 		apiGroup = app.Group(config.AppBasePath)
 	}
+	
+	// Create /api group for platform-level routes (no device required)
+	platformAPI := apiGroup.Group("/api")
 
 	// Device manager aware routing
 	dm := whatsapp.GetDeviceManager()
@@ -113,37 +116,37 @@ func restServer(_ *cobra.Command, _ []string) {
 	
 	// Initialize Agent routes (no device required - platform-level)
 	if agentService != nil {
-		rest.InitRestAgent(apiGroup, agentService)
+		rest.InitRestAgent(platformAPI, agentService)
 	}
 	
 	// Initialize Flow routes (no device required - platform-level)
 	if flowService != nil {
-		rest.InitRestFlow(apiGroup, flowService)
+		rest.InitRestFlow(platformAPI, flowService)
 	}
 	
 	// Initialize Analytics routes
 	if analyticsService != nil {
-		rest.InitRestAnalytics(apiGroup, analyticsService)
+		rest.InitRestAnalytics(platformAPI, analyticsService)
 	}
 	
 	// Initialize Conversation routes for Live Chat
 	if agentService != nil {
-		rest.InitRestConversation(apiGroup, agentService)
+		rest.InitRestConversation(platformAPI, agentService)
 	}
 	
 	// Initialize Knowledge routes for RAG
 	if knowledgeService != nil {
-		rest.InitRestKnowledge(apiGroup, knowledgeService)
+		rest.InitRestKnowledge(platformAPI, knowledgeService)
 	}
 	
 	// Initialize Settings routes
 	if settingsService != nil {
-		rest.InitRestSettings(apiGroup, settingsService)
+		rest.InitRestSettings(platformAPI, settingsService)
 	}
 	
 	// Initialize Calendar routes
 	if calendarRepository != nil {
-		rest.InitRestCalendar(apiGroup, calendarRepository)
+		rest.InitRestCalendar(platformAPI, calendarRepository)
 	}
 
 	// Device management routes (no device_id required)
