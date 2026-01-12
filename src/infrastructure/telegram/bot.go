@@ -173,26 +173,28 @@ func (b *TelegramBot) getUpdates(offset int) ([]TelegramUpdate, error) {
 	client := &http.Client{Timeout: 35 * time.Second}
 	resp, err := client.Get(url)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("HTTP request failed: %w", err)
 	}
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to read response: %w", err)
 	}
 
 	var result struct {
-		OK     bool             `json:"ok"`
-		Result []TelegramUpdate `json:"result"`
+		OK          bool             `json:"ok"`
+		Result      []TelegramUpdate `json:"result"`
+		ErrorCode   int              `json:"error_code,omitempty"`
+		Description string           `json:"description,omitempty"`
 	}
 
 	if err := json.Unmarshal(body, &result); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to parse response: %w, body: %s", err, string(body))
 	}
 
 	if !result.OK {
-		return nil, fmt.Errorf("telegram API error")
+		return nil, fmt.Errorf("telegram API error %d: %s", result.ErrorCode, result.Description)
 	}
 
 	return result.Result, nil
