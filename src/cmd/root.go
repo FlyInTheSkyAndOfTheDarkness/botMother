@@ -14,6 +14,10 @@ import (
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/config"
 	agentRepo "github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/agent"
 	flowRepo "github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/flow"
+	analyticsRepo "github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/analytics"
+	knowledgeRepo "github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/knowledge"
+	settingsRepo "github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/settings"
+	calendarRepo "github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/calendar"
 	domainApp "github.com/aldinokemal/go-whatsapp-web-multidevice/domains/app"
 	domainChat "github.com/aldinokemal/go-whatsapp-web-multidevice/domains/chat"
 	domainChatStorage "github.com/aldinokemal/go-whatsapp-web-multidevice/domains/chatstorage"
@@ -61,6 +65,21 @@ var (
 	
 	// Flow service for Flow Builder
 	flowService *usecase.FlowService
+	
+	// Analytics service for Dashboard
+	analyticsService *usecase.AnalyticsService
+	
+	// Agent database reference for analytics
+	agentDB *sql.DB
+	
+	// Knowledge service for RAG
+	knowledgeService *usecase.KnowledgeService
+	
+	// Settings service for agent configuration
+	settingsService *usecase.SettingsService
+	
+	// Calendar repository
+	calendarRepository *calendarRepo.SQLiteRepository
 )
 
 // rootCmd represents the base command when called without any subcommands
@@ -391,6 +410,43 @@ func initApp() {
 	} else {
 		flowService = usecase.NewFlowService(flowRepository)
 		logrus.Info("Flow service initialized successfully")
+	}
+	
+	// Initialize Analytics service for Dashboard
+	// Open agent database for analytics queries
+	agentDB, err = sql.Open("sqlite3", config.PathStorages+"/agents.db?_journal_mode=WAL&_busy_timeout=5000")
+	if err != nil {
+		logrus.Warnf("failed to open agent database for analytics: %v", err)
+	} else {
+		analyticsRepository := analyticsRepo.NewSQLiteRepository(agentDB, chatStorageDB)
+		analyticsService = usecase.NewAnalyticsService(analyticsRepository)
+		logrus.Info("Analytics service initialized successfully")
+	}
+	
+	// Initialize Knowledge service for RAG
+	knowledgeRepository, err := knowledgeRepo.NewSQLiteRepository(config.PathStorages + "/knowledge.db")
+	if err != nil {
+		logrus.Warnf("failed to initialize knowledge repository: %v", err)
+	} else {
+		knowledgeService = usecase.NewKnowledgeService(knowledgeRepository, agentService)
+		logrus.Info("Knowledge service initialized successfully")
+	}
+	
+	// Initialize Settings service
+	settingsRepository, err := settingsRepo.NewSQLiteRepository(config.PathStorages + "/settings.db")
+	if err != nil {
+		logrus.Warnf("failed to initialize settings repository: %v", err)
+	} else {
+		settingsService = usecase.NewSettingsService(settingsRepository)
+		logrus.Info("Settings service initialized successfully")
+	}
+	
+	// Initialize Calendar repository
+	calendarRepository, err = calendarRepo.NewSQLiteRepository(config.PathStorages + "/calendar.db")
+	if err != nil {
+		logrus.Warnf("failed to initialize calendar repository: %v", err)
+	} else {
+		logrus.Info("Calendar repository initialized successfully")
 	}
 }
 

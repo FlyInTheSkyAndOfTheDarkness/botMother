@@ -120,6 +120,31 @@ func restServer(_ *cobra.Command, _ []string) {
 	if flowService != nil {
 		rest.InitRestFlow(apiGroup, flowService)
 	}
+	
+	// Initialize Analytics routes
+	if analyticsService != nil {
+		rest.InitRestAnalytics(apiGroup, analyticsService)
+	}
+	
+	// Initialize Conversation routes for Live Chat
+	if agentService != nil {
+		rest.InitRestConversation(apiGroup, agentService)
+	}
+	
+	// Initialize Knowledge routes for RAG
+	if knowledgeService != nil {
+		rest.InitRestKnowledge(apiGroup, knowledgeService)
+	}
+	
+	// Initialize Settings routes
+	if settingsService != nil {
+		rest.InitRestSettings(apiGroup, settingsService)
+	}
+	
+	// Initialize Calendar routes
+	if calendarRepository != nil {
+		rest.InitRestCalendar(apiGroup, calendarRepository)
+	}
 
 	// Device management routes (no device_id required)
 	rest.InitRestDevice(apiGroup, deviceUsecase)

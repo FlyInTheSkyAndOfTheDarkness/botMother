@@ -68,8 +68,11 @@
     <!-- Axios -->
     <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
     
-    <!-- Flow Builder Component -->
+    <!-- Components -->
     <script src="/components/FlowBuilder.js"></script>
+    <script src="/components/Dashboard.js"></script>
+    <script src="/components/LiveChat.js"></script>
+    <script src="/components/Settings.js"></script>
     
     <style>
         [v-cloak] { display: none; }
@@ -134,19 +137,39 @@
 <body class="h-full gradient-bg text-dark-text font-sans">
     <div id="app" v-cloak class="min-h-full">
         <!-- Header -->
-        <header class="glass sticky top-0 z-50 border-b border-dark-border">
+        <header class="glass sticky top-0 z-40 border-b border-dark-border">
             <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div class="flex items-center justify-between h-16">
-                    <div class="flex items-center gap-3">
-                        <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-primary-500 to-purple-600 flex items-center justify-center">
-                            <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                            </svg>
-                        </div>
-                        <div>
-                            <h1 class="text-xl font-semibold text-white">AI Agents Platform</h1>
-                            <p class="text-xs text-dark-muted">Multi-channel AI assistants</p>
-                        </div>
+                    <div class="flex items-center gap-6">
+                        <div class="flex items-center gap-3 cursor-pointer" @click="currentView = 'dashboard'">
+                            <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-primary-500 to-purple-600 flex items-center justify-center">
+                                <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                                </svg>
+                            </div>
+                            <div>
+                                <h1 class="text-xl font-semibold text-white">AI Agents Platform</h1>
+                            </div>
+</div>
+
+                        <!-- Navigation -->
+                        <nav class="flex items-center gap-1">
+                            <button @click="currentView = 'dashboard'" 
+                                    :class="['px-4 py-2 rounded-lg text-sm font-medium transition-colors',
+                                             currentView === 'dashboard' ? 'bg-primary-500/20 text-primary-400' : 'text-dark-muted hover:text-white hover:bg-dark-border/50']">
+                                📊 Dashboard
+                            </button>
+                            <button @click="currentView = 'agents'" 
+                                    :class="['px-4 py-2 rounded-lg text-sm font-medium transition-colors',
+                                             currentView === 'agents' ? 'bg-primary-500/20 text-primary-400' : 'text-dark-muted hover:text-white hover:bg-dark-border/50']">
+                                🤖 Agents
+                            </button>
+                            <button @click="currentView = 'chat'" 
+                                    :class="['px-4 py-2 rounded-lg text-sm font-medium transition-colors',
+                                             currentView === 'chat' ? 'bg-primary-500/20 text-primary-400' : 'text-dark-muted hover:text-white hover:bg-dark-border/50']">
+                                💬 Live Chat
+                            </button>
+                        </nav>
                     </div>
                     <div class="flex items-center gap-4">
                         <span class="text-sm text-dark-muted">{{ agents.length }} agents</span>
@@ -157,8 +180,19 @@
 
         <!-- Main Content -->
         <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <!-- Dashboard View -->
+            <div v-if="currentView === 'dashboard'">
+                <dashboard></dashboard>
+            </div>
+
+            <!-- Live Chat View -->
+            <div v-else-if="currentView === 'chat'">
+                <live-chat></live-chat>
+            </div>
+            
+            <!-- Agents View -->
             <!-- Agent List View -->
-            <div v-if="!selectedAgent && !isCreating" class="animate-fade-in">
+            <div v-else-if="currentView === 'agents' && !selectedAgent && !isCreating" class="animate-fade-in">
                 <div class="flex items-center justify-between mb-8">
                     <div>
                         <h2 class="text-2xl font-bold text-white">Your Agents</h2>
@@ -232,7 +266,7 @@
     </div>
 
             <!-- Create/Edit Agent Form -->
-            <div v-if="selectedAgent || isCreating" class="max-w-3xl mx-auto animate-fade-in">
+            <div v-else-if="currentView === 'agents' && (selectedAgent || isCreating)" class="max-w-3xl mx-auto animate-fade-in">
                 <button @click="goBack" class="flex items-center gap-2 text-dark-muted hover:text-white mb-6 transition-colors">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
@@ -419,6 +453,25 @@
                             </div>
                         </div>
 
+                        <!-- Quick Actions (only for existing agents) -->
+                        <div v-if="!isCreating" class="grid grid-cols-3 gap-3 pt-6 border-t border-dark-border">
+                            <button type="button" @click="showSettings = true"
+                                    class="p-4 bg-dark-bg hover:bg-dark-border rounded-xl transition-colors text-center">
+                                <span class="text-2xl block mb-1">⚙️</span>
+                                <span class="text-sm text-white">Settings</span>
+                            </button>
+                            <button type="button" @click="showKnowledge = true"
+                                    class="p-4 bg-dark-bg hover:bg-dark-border rounded-xl transition-colors text-center">
+                                <span class="text-2xl block mb-1">📚</span>
+                                <span class="text-sm text-white">Knowledge</span>
+                            </button>
+                            <button type="button" @click="showBroadcast = true"
+                                    class="p-4 bg-dark-bg hover:bg-dark-border rounded-xl transition-colors text-center">
+                                <span class="text-2xl block mb-1">📤</span>
+                                <span class="text-sm text-white">Broadcast</span>
+                            </button>
+                        </div>
+
                         <!-- Actions -->
                         <div class="flex items-center gap-4 pt-6">
                             <button type="submit" :disabled="saving"
@@ -433,6 +486,27 @@
                     </form>
                 </div>
     </div>
+    
+            <!-- Settings Modal -->
+            <div v-if="showSettings && selectedAgent" class="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
+                <div class="glass rounded-2xl p-6 max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+                    <agent-settings :agent-id="selectedAgent.id" @close="showSettings = false"></agent-settings>
+                </div>
+            </div>
+
+            <!-- Knowledge Base Modal -->
+            <div v-if="showKnowledge && selectedAgent" class="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
+                <div class="glass rounded-2xl p-6 max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+                    <knowledge-base :agent-id="selectedAgent.id" @close="showKnowledge = false"></knowledge-base>
+                </div>
+            </div>
+
+            <!-- Broadcast Modal -->
+            <div v-if="showBroadcast && selectedAgent" class="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
+                <div class="glass rounded-2xl p-6 max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+                    <broadcast :agent-id="selectedAgent.id" @close="showBroadcast = false"></broadcast>
+                </div>
+            </div>
 
             <!-- Flow Builder -->
             <flow-builder v-if="showFlowBuilder" 
@@ -509,7 +583,18 @@
         const { createApp, ref, reactive, computed, onMounted } = Vue;
 
         createApp({
+            components: {
+                'dashboard': Dashboard,
+                'live-chat': LiveChat,
+                'flow-builder': FlowBuilder,
+                'agent-settings': AgentSettings,
+                'knowledge-base': KnowledgeBase,
+                'broadcast': Broadcast
+            },
             setup() {
+                // Navigation
+                const currentView = ref('dashboard');
+                
                 const agents = ref([]);
                 const selectedAgent = ref(null);
                 const isCreating = ref(false);
@@ -525,6 +610,11 @@
                 const flows = ref([]);
                 const showFlowBuilder = ref(false);
                 const editingFlowId = ref(null);
+                
+                // Modals
+                const showSettings = ref(false);
+                const showKnowledge = ref(false);
+                const showBroadcast = ref(false);
                 
                 const form = reactive({
                     name: '',
@@ -560,6 +650,7 @@
                 };
 
                 const startCreating = () => {
+                    currentView.value = 'agents';
                     isCreating.value = true;
                     selectedAgent.value = null;
                     Object.assign(form, {
@@ -754,6 +845,7 @@
                 });
 
                 return {
+                    currentView,
                     agents,
                     selectedAgent,
                     isCreating,
@@ -769,6 +861,9 @@
                     flows,
                     showFlowBuilder,
                     editingFlowId,
+                    showSettings,
+                    showKnowledge,
+                    showBroadcast,
                     startCreating,
                     selectAgent,
                     goBack,
