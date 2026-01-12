@@ -738,9 +738,32 @@
                 };
 
                 const saveAgent = async () => {
+                    // Validate required fields
+                    if (isCreating.value) {
+                        if (!form.name || form.name.trim() === '') {
+                            showToast('Agent Name is required', 'error');
+                            return;
+                        }
+                        if (!form.api_key || form.api_key.trim() === '') {
+                            showToast('OpenAI API Key is required', 'error');
+                            return;
+                        }
+                        if (!form.system_prompt || form.system_prompt.trim() === '') {
+                            showToast('System Prompt is required', 'error');
+                            return;
+                        }
+                    }
+                    
                     saving.value = true;
                     try {
                         if (isCreating.value) {
+                            console.log('Creating agent with data:', {
+                                name: form.name,
+                                model: form.model,
+                                has_api_key: !!form.api_key,
+                                has_serp_key: !!form.serp_api_key,
+                                has_system_prompt: !!form.system_prompt
+                            });
                             await axios.post('/api/agents', form);
                             showToast('Agent created successfully');
                         } else {
@@ -758,7 +781,10 @@
                         await loadAgents();
                         goBack();
                     } catch (error) {
-                        showToast(error.response?.data?.message || 'Failed to save agent', 'error');
+                        const errorMsg = error.response?.data?.message || error.message || 'Failed to save agent';
+                        console.error('Agent save error:', error);
+                        console.error('Error response:', error.response?.data);
+                        showToast(errorMsg, 'error');
                     } finally {
                         saving.value = false;
                     }
