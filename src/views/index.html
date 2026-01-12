@@ -712,11 +712,17 @@
                 };
 
                 const hasIntegration = (type) => {
-                    return selectedAgent.value?.integrations?.some(i => i.type === type);
+                    // Check if integration exists AND is connected
+                    const integration = selectedAgent.value?.integrations?.find(i => i.type === type);
+                    return integration && integration.is_connected;
                 };
 
                 const getIntegration = (type) => {
                     return selectedAgent.value?.integrations?.find(i => i.type === type);
+                };
+
+                const integrationExists = (type) => {
+                    return selectedAgent.value?.integrations?.some(i => i.type === type);
                 };
 
                 const connectIntegration = async (type) => {
