@@ -394,9 +394,12 @@ func initApp() {
 	deviceUsecase = usecase.NewDeviceService(dm)
 	
 	// Initialize Agent service for AI Agents Platform
-	agentRepository, err := agentRepo.NewSQLiteRepository(config.PathStorages + "/agents.db")
+	agentDBPath := config.PathStorages + "/agents.db"
+	logrus.Infof("Initializing agent repository at: %s", agentDBPath)
+	agentRepository, err := agentRepo.NewSQLiteRepository(agentDBPath)
 	if err != nil {
-		logrus.Warnf("failed to initialize agent repository: %v", err)
+		logrus.Errorf("failed to initialize agent repository: %v", err)
+		logrus.Warn("Agent routes will not be available")
 	} else {
 		agentService = usecase.NewAgentService(agentRepository)
 		// Initialize WhatsApp message handler for agents

@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/domains/agent"
@@ -45,8 +46,6 @@ func (r *SQLiteRepository) migrate() error {
 			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 		)`,
-		// Migration for existing tables
-		`ALTER TABLE agents ADD COLUMN serp_api_key TEXT DEFAULT ''`,
 		`CREATE TABLE IF NOT EXISTS integrations (
 			id TEXT PRIMARY KEY,
 			agent_id TEXT NOT NULL,
