@@ -130,13 +130,43 @@ func (b *TelegramBot) Start() {
 	b.running = true
 	b.mu.Unlock()
 
-	logrus.Infof("Telegram bot starting for agent %s with token %s...", b.AgentID, b.Token[:10]+"...")
+	tokenPreview := b.Token
+	if len(tokenPreview) > 15 {
+		tokenPreview = tokenPreview[:15] + "..."
+	}
+	logrus.Infof("🤖 Telegram bot STARTING for agent %s (token: %s)", b.AgentID, tokenPreview)
+
+	// Test connection first
+	testURL := fmt.Sprintf("https://api.telegram.org/bot%s/getMe", b.Token)
+	resp, err := http.Get(testURL)
+	if err != nil {
+		logrus.Errorf("❌ Telegram bot connection test failed: %v", err)
+		return
+	}
+	defer resp.Body.Close()
+	
+	body, _ := io.ReadAll(resp.Body)
+	var meResult struct {
+		OK     bool `json:"ok"`
+		Result struct {
+			Username string `json:"username"`
+		} `json:"result"`
+		Description string `json:"description"`
+	}
+	json.Unmarshal(body, &meResult)
+	
+	if !meResult.OK {
+		logrus.Errorf("❌ Telegram bot auth failed: %s", meResult.Description)
+		return
+	}
+	
+	logrus.Infof("✅ Telegram bot @%s connected successfully!", meResult.Result.Username)
 
 	offset := 0
 	for {
 		select {
 		case <-b.stopChan:
-			logrus.Info("Telegram bot stopped")
+			logrus.Info("🛑 Telegram bot stopped")
 			return
 		default:
 			updates, err := b.getUpdates(offset)
@@ -206,28 +236,59 @@ func (b *TelegramBot) handleUpdate(update TelegramUpdate) {
 	}
 
 	msg := update.Message
+	
+	// Safety checks
+	if msg.Chat == nil {
+		logrus.Warn("Telegram message has no chat info")
+		return
+	}
+	if msg.From == nil {
+		logrus.Warn("Telegram message has no sender info")
+		return
+	}
+	
 	chatID := msg.Chat.ID
 	userMessage := msg.Text
 	userID := fmt.Sprintf("tg_%d", msg.From.ID)
 
-	logrus.Infof("Telegram message from %s: %s", userID, userMessage)
+	logrus.Infof("Telegram message from %s (chat %d): %s", userID, chatID, userMessage)
+
+	// Check if agent service is available
+	if b.agentService == nil {
+		logrus.Error("Agent service is nil, cannot process message")
+		return
+	}
 
 	// Get AI response from agent service
 	ctx := context.Background()
 	response, err := b.agentService.HandleIncomingMessage(ctx, b.AgentID, b.IntegrationID, userID, userMessage)
 	if err != nil {
-		logrus.Errorf("Failed to get AI response: %v", err)
-		response = "Sorry, I encountered an error processing your message."
+		logrus.Errorf("Failed to get AI response for agent %s: %v", b.AgentID, err)
+		// Send error message to user
+		b.sendMessage(chatID, "Sorry, I encountered an error processing your message.")
+		return
 	}
 
 	if response == "" {
+		logrus.Warn("AI returned empty response")
 		return
 	}
+
+	logrus.Infof("Sending response to chat %d: %s", chatID, response[:min(50, len(response))]+"...")
 
 	// Send response
 	if err := b.sendMessage(chatID, response); err != nil {
 		logrus.Errorf("Failed to send Telegram message: %v", err)
+	} else {
+		logrus.Infof("Successfully sent response to chat %d", chatID)
 	}
+}
+
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }
 
 func (b *TelegramBot) sendMessage(chatID int64, text string) error {
