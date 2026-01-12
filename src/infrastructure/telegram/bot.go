@@ -277,6 +277,7 @@ func (b *TelegramBot) handleUpdate(update TelegramUpdate) {
 
 	// Get AI response from agent service
 	ctx := context.Background()
+	logrus.Infof("Calling HandleIncomingMessage for agent %s, integration %s, user %s", agentID, integrationID, userID)
 	response, err := agentSvc.HandleIncomingMessage(ctx, agentID, integrationID, userID, userMessage)
 	if err != nil {
 		// Just log the error, don't send anything to user
@@ -285,9 +286,11 @@ func (b *TelegramBot) handleUpdate(update TelegramUpdate) {
 	}
 
 	if response == "" {
-		logrus.Debug("AI returned empty response, not sending anything")
+		logrus.Warnf("AI returned empty response for agent %s (manual mode or error)", agentID)
 		return
 	}
+	
+	logrus.Infof("AI response generated for agent %s: %s", agentID, response[:min(50, len(response))])
 
 	// Send response using captured token
 	if err := sendTelegramMessage(token, chatID, response); err != nil {
@@ -299,6 +302,11 @@ func (b *TelegramBot) handleUpdate(update TelegramUpdate) {
 
 // sendTelegramMessage sends a message using given token (thread-safe)
 func sendTelegramMessage(token string, chatID int64, text string) error {
+	return SendMessageDirect(token, chatID, text)
+}
+
+// SendMessageDirect sends a message directly via Telegram API (exported for use by other packages)
+func SendMessageDirect(token string, chatID int64, text string) error {
 	url := fmt.Sprintf("https://api.telegram.org/bot%s/sendMessage", token)
 	
 	payload := map[string]interface{}{

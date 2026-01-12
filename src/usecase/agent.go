@@ -175,8 +175,12 @@ func (s *AgentService) HandleIncomingMessage(ctx context.Context, agentID, integ
 			Content:        userMessage,
 		}
 		s.repo.AddMessage(ctx, userMsg)
+		// Log for debugging
+		fmt.Printf("[AgentService] Conversation %s is in manual mode, skipping AI response\n", conv.ID)
 		return "", nil // Return empty - no AI response in manual mode
 	}
+	
+	fmt.Printf("[AgentService] Processing message for conv %s, agent active: %v, manual mode: %v\n", conv.ID, a.IsActive, conv.IsManualMode)
 
 	// Store user message
 	userMsg := &agent.Message{
@@ -204,8 +208,8 @@ func (s *AgentService) HandleIncomingMessage(ctx context.Context, agentID, integ
 			return "", fmt.Errorf("failed to initialize AI service")
 		}
 
-		// Get recent messages for context
-		recentMessages, err := s.repo.GetRecentMessages(ctx, conv.ID, 10)
+		// Get recent messages for context (limited to 5 for efficiency)
+		recentMessages, err := s.repo.GetRecentMessages(ctx, conv.ID, 5)
 		if err != nil {
 			return "", fmt.Errorf("failed to get recent messages: %w", err)
 		}
@@ -350,5 +354,20 @@ func (s *AgentService) AddManualMessage(ctx context.Context, conversationID, con
 		return nil, err
 	}
 	return msg, nil
+}
+
+// GetConversationDetails returns conversation with integration details for sending messages
+func (s *AgentService) GetConversationDetails(ctx context.Context, conversationID string) (*agent.Conversation, *agent.Integration, error) {
+	conv, err := s.repo.GetConversationByID(ctx, conversationID)
+	if err != nil {
+		return nil, nil, err
+	}
+	
+	integration, err := s.repo.GetIntegrationByID(ctx, conv.IntegrationID)
+	if err != nil {
+		return nil, nil, err
+	}
+	
+	return conv, integration, nil
 }
 

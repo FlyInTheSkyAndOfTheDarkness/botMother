@@ -2,9 +2,13 @@ package rest
 
 import (
 	"encoding/csv"
+	"encoding/json"
 	"fmt"
+	"strconv"
 	"strings"
 
+	"github.com/aldinokemal/go-whatsapp-web-multidevice/domains/agent"
+	telegramBot "github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/telegram"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/pkg/utils"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/usecase"
 	"github.com/gofiber/fiber/v2"
@@ -193,14 +197,44 @@ func (h *ConversationHandler) SendMessage(c *fiber.Ctx) error {
 		return fiber.NewError(fiber.StatusBadRequest, "Content is required")
 	}
 
-	// Add message to conversation
+	// Get conversation details to know where to send
+	conv, integration, err := h.AgentService.GetConversationDetails(c.UserContext(), conversationID)
+	if err != nil {
+		return fiber.NewError(fiber.StatusNotFound, "Conversation not found: "+err.Error())
+	}
+
+	// Actually send the message via WhatsApp/Telegram
+	switch integration.Type {
+	case agent.IntegrationTypeTelegram:
+		// Parse chat ID from remote_jid (format: tg_123456789)
+		chatIDStr := strings.TrimPrefix(conv.RemoteJID, "tg_")
+		chatID, err := strconv.ParseInt(chatIDStr, 10, 64)
+		if err != nil {
+			return fiber.NewError(fiber.StatusBadRequest, "Invalid Telegram chat ID")
+		}
+		
+		// Get bot token from integration config
+		var config agent.TelegramConfig
+		if err := json.Unmarshal([]byte(integration.Config), &config); err != nil {
+			return fiber.NewError(fiber.StatusInternalServerError, "Failed to parse integration config")
+		}
+		
+		// Send via Telegram
+		if err := telegramBot.SendMessageDirect(config.BotToken, chatID, req.Content); err != nil {
+			return fiber.NewError(fiber.StatusInternalServerError, "Failed to send Telegram message: "+err.Error())
+		}
+		
+	case agent.IntegrationTypeWhatsApp:
+		// TODO: Implement WhatsApp sending
+		// For now just log - WhatsApp requires device client
+		return fiber.NewError(fiber.StatusNotImplemented, "WhatsApp manual messaging not yet implemented")
+	}
+
+	// Add message to conversation after successful send
 	msg, err := h.AgentService.AddManualMessage(c.UserContext(), conversationID, req.Content)
 	if err != nil {
 		return fiber.NewError(fiber.StatusInternalServerError, err.Error())
 	}
-
-	// TODO: Actually send the message via WhatsApp/Telegram
-	// This requires integration with the messaging platform
 
 	return c.JSON(utils.ResponseData{
 		Status:  200,
