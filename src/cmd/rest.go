@@ -116,7 +116,7 @@ func restServer(_ *cobra.Command, _ []string) {
 	
 	// Initialize Agent routes (no device required - platform-level)
 	if agentService != nil {
-		rest.InitRestAgent(platformAPI, agentService)
+		rest.InitRestAgent(platformAPI, agentService, appUsecase)
 	}
 	
 	// Initialize Flow routes (no device required - platform-level)

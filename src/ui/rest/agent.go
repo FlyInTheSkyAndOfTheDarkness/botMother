@@ -2,20 +2,25 @@ package rest
 
 import (
 	"encoding/json"
+	"fmt"
 	
+	"github.com/aldinokemal/go-whatsapp-web-multidevice/config"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/domains/agent"
+	domainApp "github.com/aldinokemal/go-whatsapp-web-multidevice/domains/app"
 	telegramBot "github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/telegram"
+	"github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/whatsapp"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/pkg/utils"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/usecase"
 	"github.com/gofiber/fiber/v2"
 )
 
 type AgentHandler struct {
-	Service *usecase.AgentService
+	Service    *usecase.AgentService
+	AppService domainApp.IAppUsecase
 }
 
-func InitRestAgent(app fiber.Router, service *usecase.AgentService) AgentHandler {
-	handler := AgentHandler{Service: service}
+func InitRestAgent(app fiber.Router, service *usecase.AgentService, appService domainApp.IAppUsecase) AgentHandler {
+	handler := AgentHandler{Service: service, AppService: appService}
 
 	// Agent CRUD
 	app.Get("/agents", handler.GetAllAgents)
@@ -29,6 +34,9 @@ func InitRestAgent(app fiber.Router, service *usecase.AgentService) AgentHandler
 	app.Delete("/agents/:id/integrations/:integrationId", handler.DeleteIntegration)
 	app.Post("/agents/:id/integrations/:integrationId/connect", handler.ConnectIntegration)
 	app.Post("/agents/:id/integrations/:integrationId/disconnect", handler.DisconnectIntegration)
+	
+	// WhatsApp QR endpoint
+	app.Get("/whatsapp/qr", handler.GetWhatsAppQR)
 
 	return handler
 }
@@ -304,6 +312,51 @@ func (h *AgentHandler) DisconnectIntegration(c *fiber.Ctx) error {
 		Code:    "SUCCESS",
 		Message: "Integration disconnected successfully",
 		Results: nil,
+	})
+}
+
+// GetWhatsAppQR generates a QR code for WhatsApp login
+func (h *AgentHandler) GetWhatsAppQR(c *fiber.Ctx) error {
+	// Get device manager
+	dm := whatsapp.GetDeviceManager()
+	if dm == nil {
+		return fiber.NewError(fiber.StatusInternalServerError, "Device manager not available")
+	}
+
+	// Get or create a device
+	devices := dm.ListDevices()
+	var deviceID string
+	
+	if len(devices) > 0 {
+		deviceID = devices[0].ID()
+	} else {
+		// Create new device
+		device, err := dm.CreateDevice(c.UserContext(), "")
+		if err != nil {
+			return fiber.NewError(fiber.StatusInternalServerError, "Failed to create device: "+err.Error())
+		}
+		deviceID = device.ID()
+	}
+
+	// Generate QR using AppService
+	if h.AppService == nil {
+		return fiber.NewError(fiber.StatusInternalServerError, "App service not available")
+	}
+
+	response, err := h.AppService.Login(c.UserContext(), deviceID)
+	if err != nil {
+		return fiber.NewError(fiber.StatusInternalServerError, "Failed to generate QR: "+err.Error())
+	}
+
+	return c.JSON(utils.ResponseData{
+		Status:  200,
+		Code:    "SUCCESS",
+		Message: "QR code generated",
+		Results: map[string]any{
+			"device_id": deviceID,
+			"qr_link":   fmt.Sprintf("%s://%s%s/%s", c.Protocol(), c.Hostname(), config.AppBasePath, response.ImagePath),
+			"qr_duration": response.Duration,
+		},
 	})
 }
 
