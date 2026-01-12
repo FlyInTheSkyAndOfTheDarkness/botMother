@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/domains/agent"
