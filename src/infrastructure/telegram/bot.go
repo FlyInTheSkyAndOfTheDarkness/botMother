@@ -263,33 +263,24 @@ func (b *TelegramBot) handleUpdate(update TelegramUpdate) {
 	ctx := context.Background()
 	response, err := b.agentService.HandleIncomingMessage(ctx, b.AgentID, b.IntegrationID, userID, userMessage)
 	if err != nil {
+		// Just log the error, don't send anything to user
 		logrus.Errorf("Failed to get AI response for agent %s: %v", b.AgentID, err)
-		// Send error message to user
-		b.sendMessage(chatID, "Sorry, I encountered an error processing your message.")
 		return
 	}
 
 	if response == "" {
-		logrus.Warn("AI returned empty response")
+		logrus.Debug("AI returned empty response, not sending anything")
 		return
 	}
-
-	logrus.Infof("Sending response to chat %d: %s", chatID, response[:min(50, len(response))]+"...")
 
 	// Send response
 	if err := b.sendMessage(chatID, response); err != nil {
 		logrus.Errorf("Failed to send Telegram message: %v", err)
 	} else {
-		logrus.Infof("Successfully sent response to chat %d", chatID)
+		logrus.Infof("Sent response to chat %d", chatID)
 	}
 }
 
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
-}
 
 func (b *TelegramBot) sendMessage(chatID int64, text string) error {
 	url := fmt.Sprintf("https://api.telegram.org/bot%s/sendMessage", b.Token)
