@@ -27,6 +27,13 @@ func NewService(apiToken string, serpAPIKey string) *Service {
 	}
 	if serpAPIKey != "" {
 		s.serpService = serp.NewService(serpAPIKey)
+		if s.serpService != nil {
+			logrus.Infof("SerpAPI service initialized (key length: %d)", len(serpAPIKey))
+		} else {
+			logrus.Warnf("Failed to initialize SerpAPI service (key length: %d)", len(serpAPIKey))
+		}
+	} else {
+		logrus.Debug("SerpAPI service not initialized (no API key provided)")
 	}
 	return s
 }
