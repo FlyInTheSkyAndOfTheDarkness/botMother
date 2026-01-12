@@ -12,6 +12,7 @@ import (
 	"go.mau.fi/whatsmeow/store/sqlstore"
 
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/config"
+	agentRepo "github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/agent"
 	domainApp "github.com/aldinokemal/go-whatsapp-web-multidevice/domains/app"
 	domainChat "github.com/aldinokemal/go-whatsapp-web-multidevice/domains/chat"
 	domainChatStorage "github.com/aldinokemal/go-whatsapp-web-multidevice/domains/chatstorage"
@@ -53,6 +54,9 @@ var (
 	groupUsecase      domainGroup.IGroupUsecase
 	newsletterUsecase domainNewsletter.INewsletterUsecase
 	deviceUsecase     domainDevice.IDeviceUsecase
+	
+	// Agent service for AI Agents Platform
+	agentService *usecase.AgentService
 )
 
 // rootCmd represents the base command when called without any subcommands
@@ -364,6 +368,17 @@ func initApp() {
 	groupUsecase = usecase.NewGroupService()
 	newsletterUsecase = usecase.NewNewsletterService()
 	deviceUsecase = usecase.NewDeviceService(dm)
+	
+	// Initialize Agent service for AI Agents Platform
+	agentRepository, err := agentRepo.NewSQLiteRepository(config.PathStorages + "/agents.db")
+	if err != nil {
+		logrus.Warnf("failed to initialize agent repository: %v", err)
+	} else {
+		agentService = usecase.NewAgentService(agentRepository)
+		// Initialize WhatsApp message handler for agents
+		whatsapp.InitAgentHandler(agentRepository)
+		logrus.Info("Agent service initialized successfully")
+	}
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.

@@ -110,6 +110,11 @@ func restServer(_ *cobra.Command, _ []string) {
 		rest.InitRestNewsletter(r, newsletterUsecase)
 		websocket.RegisterRoutes(r, appUsecase)
 	}
+	
+	// Initialize Agent routes (no device required - platform-level)
+	if agentService != nil {
+		rest.InitRestAgent(apiGroup, agentService)
+	}
 
 	// Device management routes (no device_id required)
 	rest.InitRestDevice(apiGroup, deviceUsecase)

@@ -36,7 +36,12 @@ func handleMessage(ctx context.Context, evt *events.Message, chatStorageRepo dom
 	// Auto-mark message as read if configured
 	handleAutoMarkRead(ctx, evt, client)
 
-	// Handle AI chatbot if enabled (takes precedence over auto-reply)
+	// Handle AI Agents (per-agent integrations) - takes highest precedence
+	if handler := GetAgentHandler(); handler != nil {
+		handler.HandleIncomingMessage(ctx, evt, chatStorageRepo, client)
+	}
+	
+	// Handle legacy AI chatbot if enabled (takes precedence over auto-reply)
 	if config.AIChatbotEnabled {
 		handleAIChatbot(ctx, evt, chatStorageRepo, client)
 	} else {

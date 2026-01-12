@@ -1,5 +1,6 @@
 services:
-  whatsapp_go:
+  ai_agents_platform:
+    container_name: ai-agents-platform
     logging:
       driver: "json-file"
       options:
@@ -13,3 +14,6 @@ services:
       - "3000:3000"
     env_file:
       - src/.env
+    volumes:
+      - ./data/storages:/app/storages
+      - ./data/media:/app/statics/media

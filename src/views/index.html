@@ -1,436 +1,685 @@
-<!doctype html>
-<html lang="en">
+<!DOCTYPE html>
+<html lang="en" class="h-full">
 <head>
-    <!-- Required meta tags -->
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <!-- Bootstrap CSS -->
-    <link rel="stylesheet" type="text/css"
-          href="https://cdnjs.cloudflare.com/ajax/libs/fomantic-ui/2.8.8/semantic.min.css">
-    <link rel="stylesheet" href="https://cdn.datatables.net/1.11.4/css/dataTables.semanticui.min.css">
-    <link rel="stylesheet" href="{{ .AppBasePath }}/assets/app.css">
-    <script src="https://code.jquery.com/jquery-3.1.1.min.js"></script>
-    <script src="https://cdn.datatables.net/1.11.4/js/jquery.dataTables.min.js"></script>
-    <script src="https://cdn.datatables.net/1.11.4/js/dataTables.semanticui.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/fomantic-ui/2.8.8/semantic.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/vue@3/dist/vue.global.prod.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/axios@1.6.0/dist/axios.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.4/moment.min.js"></script>
-    <title>WhatsApp API {{ .AppVersion }}</title>
-</head>
-<body>
-<div id="splash-screen">
-    <!-- Clean squircle logo without background wrapper -->
-    <img src="{{ .AppBasePath }}/assets/gowa.svg" alt="GoWA Logo" class="splash-icon" id="main-logo">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Agents Platform</title>
     
-    <h2 class="splash-title">WhatsApp API</h2>
-    <div class="ui active large inline loader splash-spinner"></div>
-</div>
-
-<div class="ui container" id="app" style="display: none;">
-    <div class="main-header">
-        <h1 class="ui header center aligned">
-            <div class="title-container">
-                <img src="{{ .AppBasePath }}/assets/gowa.svg" alt="GoWA Logo">
-                
-                <span>WhatsApp API</span>
-                
-                <div class="version-label">
-                    {{ .AppVersion }}
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        primary: {
+                            50: '#f0f9ff',
+                            100: '#e0f2fe',
+                            200: '#bae6fd',
+                            300: '#7dd3fc',
+                            400: '#38bdf8',
+                            500: '#0ea5e9',
+                            600: '#0284c7',
+                            700: '#0369a1',
+                            800: '#075985',
+                            900: '#0c4a6e',
+                        },
+                        dark: {
+                            bg: '#0f172a',
+                            card: '#1e293b',
+                            border: '#334155',
+                            text: '#e2e8f0',
+                            muted: '#94a3b8',
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Outfit', 'system-ui', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    },
+                    animation: {
+                        'fade-in': 'fadeIn 0.5s ease-out',
+                        'slide-up': 'slideUp 0.4s ease-out',
+                        'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                    },
+                    keyframes: {
+                        fadeIn: {
+                            '0%': { opacity: '0' },
+                            '100%': { opacity: '1' },
+                        },
+                        slideUp: {
+                            '0%': { opacity: '0', transform: 'translateY(20px)' },
+                            '100%': { opacity: '1', transform: 'translateY(0)' },
+                        },
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    
+    <!-- Vue 3 -->
+    <script src="https://cdn.jsdelivr.net/npm/vue@3/dist/vue.global.prod.js"></script>
+    
+    <!-- Axios -->
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    
+    <style>
+        [v-cloak] { display: none; }
+        
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #1e293b;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #475569;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #64748b;
+        }
+        
+        /* Gradient background */
+        .gradient-bg {
+            background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%);
+        }
+        
+        /* Glass effect */
+        .glass {
+            background: rgba(30, 41, 59, 0.8);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(71, 85, 105, 0.5);
+        }
+        
+        /* Glow effect */
+        .glow {
+            box-shadow: 0 0 40px rgba(14, 165, 233, 0.15);
+        }
+        
+        /* Input focus glow */
+        input:focus, textarea:focus, select:focus {
+            box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.2);
+        }
+        
+        /* Status indicator */
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+        }
+        .status-connected {
+            background: #22c55e;
+            box-shadow: 0 0 8px rgba(34, 197, 94, 0.6);
+        }
+        .status-disconnected {
+            background: #64748b;
+        }
+        .status-pending {
+            background: #f59e0b;
+            animation: pulse 2s infinite;
+        }
+    </style>
+</head>
+<body class="h-full gradient-bg text-dark-text font-sans">
+    <div id="app" v-cloak class="min-h-full">
+        <!-- Header -->
+        <header class="glass sticky top-0 z-50 border-b border-dark-border">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="flex items-center justify-between h-16">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-primary-500 to-purple-600 flex items-center justify-center">
+                            <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                            </svg>
+                        </div>
+                        <div>
+                            <h1 class="text-xl font-semibold text-white">AI Agents Platform</h1>
+                            <p class="text-xs text-dark-muted">Multi-channel AI assistants</p>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-4">
+                        <span class="text-sm text-dark-muted">{{ agents.length }} agents</span>
+                    </div>
                 </div>
             </div>
-        </h1>
+        </header>
+
+        <!-- Main Content -->
+        <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <!-- Agent List View -->
+            <div v-if="!selectedAgent && !isCreating" class="animate-fade-in">
+                <div class="flex items-center justify-between mb-8">
+                    <div>
+                        <h2 class="text-2xl font-bold text-white">Your Agents</h2>
+                        <p class="text-dark-muted mt-1">Create and manage your AI assistants</p>
+                    </div>
+                    <button @click="startCreating" 
+                            class="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-primary-600 to-primary-500 hover:from-primary-500 hover:to-primary-400 text-white font-medium rounded-xl transition-all duration-200 shadow-lg shadow-primary-500/25 hover:shadow-primary-500/40">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                        </svg>
+                        New Agent
+                    </button>
     </div>
 
-    <div class="ui info message" v-if="selectedDeviceId">
-        <div class="header">
-            <i class="linkify icon"></i>
-            Device context active
+                <!-- Empty State -->
+                <div v-if="agents.length === 0" class="text-center py-20">
+                    <div class="w-24 h-24 mx-auto mb-6 rounded-2xl bg-dark-card flex items-center justify-center">
+                        <svg class="w-12 h-12 text-dark-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+                        </svg>
         </div>
-        <p>
-            Using device: <b>[[ selectedDeviceId ]]</b>.
-            REST/WebSocket send <code>X-Device-Id</code> (or <code>?device_id=</code> for WS).
-        </p>
+                    <h3 class="text-xl font-semibold text-white mb-2">No agents yet</h3>
+                    <p class="text-dark-muted mb-6">Create your first AI agent to get started</p>
+                    <button @click="startCreating" class="px-6 py-3 bg-primary-600 hover:bg-primary-500 text-white font-medium rounded-xl transition-colors">
+                        Create your first agent
+                    </button>
     </div>
 
-    <device-manager 
-        ref="deviceManager"
-        ws-base-path="{{ .AppBasePath }}"
-        @device-selected="handleDeviceSelected"
-        @devices-updated="handleDevicesUpdated">
-    </device-manager>
-
-    <div class="ui horizontal divider">
-        App
+                <!-- Agent Cards Grid -->
+                <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <div v-for="(agent, index) in agents" :key="agent.id" 
+                         class="glass rounded-2xl p-6 hover:border-primary-500/50 transition-all duration-300 cursor-pointer glow animate-slide-up"
+                         :style="{ animationDelay: index * 0.1 + 's' }"
+                         @click="selectAgent(agent)">
+                        <div class="flex items-start justify-between mb-4">
+                            <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-primary-500/20 to-purple-500/20 flex items-center justify-center">
+                                <svg class="w-6 h-6 text-primary-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                                </svg>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <span :class="['status-dot', agent.is_active ? 'status-connected' : 'status-disconnected']"></span>
+                                <span class="text-xs" :class="agent.is_active ? 'text-green-400' : 'text-dark-muted'">
+                                    {{ agent.is_active ? 'Active' : 'Inactive' }}
+                                </span>
+                            </div>
+                        </div>
+                        <h3 class="text-lg font-semibold text-white mb-1">{{ agent.name }}</h3>
+                        <p class="text-sm text-dark-muted mb-4 line-clamp-2">{{ agent.description || 'No description' }}</p>
+                        
+                        <div class="flex items-center gap-3 mb-4">
+                            <span class="px-2.5 py-1 bg-dark-bg rounded-lg text-xs font-mono text-dark-muted">{{ agent.model }}</span>
+                            <span class="px-2.5 py-1 bg-dark-bg rounded-lg text-xs font-mono text-dark-muted">{{ agent.api_key_masked }}</span>
     </div>
 
-    <div class="ui warning message" v-if="!selectedDeviceId">
-        <div class="header">Device required</div>
-        <p>Select or create a device above. Provide <code>X-Device-Id</code> on REST calls.</p>
+                        <!-- Integration Icons -->
+                        <div class="flex items-center gap-2 pt-4 border-t border-dark-border">
+                            <span class="text-xs text-dark-muted mr-2">Integrations:</span>
+                            <div v-for="integration in agent.integrations" :key="integration.id" 
+                                 class="flex items-center gap-1.5 px-2 py-1 rounded-lg"
+                                 :class="integration.is_connected ? 'bg-green-500/10 text-green-400' : 'bg-dark-bg text-dark-muted'">
+                                <span v-if="integration.type === 'whatsapp'" class="text-sm">📱</span>
+                                <span v-else-if="integration.type === 'telegram'" class="text-sm">✈️</span>
+                                <span v-else-if="integration.type === 'instagram'" class="text-sm">📷</span>
+                                <span class="text-xs capitalize">{{ integration.type }}</span>
+                            </div>
+                            <span v-if="!agent.integrations || agent.integrations.length === 0" class="text-xs text-dark-muted">None</span>
+                        </div>
+                    </div>
+                </div>
     </div>
 
-    <div class="ui three column stackable grid cards" :class="{disabled: !selectedDeviceId}">
-        <app-login :logged-in="isSelectedDeviceLoggedIn"></app-login>
-        <app-logout @reload-devices="handleReloadDevice"></app-logout>
-        <app-reconnect @reload-devices="handleReloadDevice"></app-reconnect>
-        <app-login-with-code :logged-in="isSelectedDeviceLoggedIn"></app-login-with-code>
+            <!-- Create/Edit Agent Form -->
+            <div v-if="selectedAgent || isCreating" class="max-w-3xl mx-auto animate-fade-in">
+                <button @click="goBack" class="flex items-center gap-2 text-dark-muted hover:text-white mb-6 transition-colors">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+                    </svg>
+                    Back to agents
+                </button>
+
+                <div class="glass rounded-2xl p-8 glow">
+                    <h2 class="text-2xl font-bold text-white mb-2">
+                        {{ isCreating ? 'Create New Agent' : 'Edit Agent' }}
+                    </h2>
+                    <p class="text-dark-muted mb-8">Configure your AI assistant settings</p>
+
+                    <form @submit.prevent="saveAgent" class="space-y-6">
+                        <!-- Basic Info -->
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div>
+                                <label class="block text-sm font-medium text-dark-text mb-2">Agent Name *</label>
+                                <input v-model="form.name" type="text" required
+                                       class="w-full px-4 py-3 bg-dark-bg border border-dark-border rounded-xl text-white placeholder-dark-muted focus:border-primary-500 focus:outline-none transition-colors"
+                                       placeholder="e.g. Customer Support Bot">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-dark-text mb-2">Model *</label>
+                                <select v-model="form.model" required
+                                        class="w-full px-4 py-3 bg-dark-bg border border-dark-border rounded-xl text-white focus:border-primary-500 focus:outline-none transition-colors">
+                                    <option value="gpt-4o-mini">GPT-4o Mini (Fast & Cheap)</option>
+                                    <option value="gpt-4o">GPT-4o (Best Quality)</option>
+                                    <option value="gpt-4-turbo">GPT-4 Turbo</option>
+                                    <option value="gpt-3.5-turbo">GPT-3.5 Turbo (Legacy)</option>
+                                </select>
+                            </div>
     </div>
 
-    <div class="ui horizontal divider">
-        🤖 AI Chatbot
+                        <div>
+                            <label class="block text-sm font-medium text-dark-text mb-2">Description</label>
+                            <input v-model="form.description" type="text"
+                                   class="w-full px-4 py-3 bg-dark-bg border border-dark-border rounded-xl text-white placeholder-dark-muted focus:border-primary-500 focus:outline-none transition-colors"
+                                   placeholder="Brief description of this agent's purpose">
     </div>
 
-    <div class="ui one column stackable grid cards">
-        <ai-chatbot-config></ai-chatbot-config>
+                        <div>
+                            <label class="block text-sm font-medium text-dark-text mb-2">
+                                OpenAI API Key *
+                                <span v-if="!isCreating && form.api_key === ''" class="text-dark-muted font-normal">(leave empty to keep current)</span>
+                            </label>
+                            <input v-model="form.api_key" :type="showApiKey ? 'text' : 'password'" :required="isCreating"
+                                   class="w-full px-4 py-3 bg-dark-bg border border-dark-border rounded-xl text-white font-mono placeholder-dark-muted focus:border-primary-500 focus:outline-none transition-colors"
+                                   placeholder="sk-...">
+                            <button type="button" @click="showApiKey = !showApiKey" class="mt-2 text-xs text-dark-muted hover:text-white">
+                                {{ showApiKey ? 'Hide' : 'Show' }} API Key
+                            </button>
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-dark-text mb-2">System Prompt *</label>
+                            <textarea v-model="form.system_prompt" required rows="5"
+                                      class="w-full px-4 py-3 bg-dark-bg border border-dark-border rounded-xl text-white placeholder-dark-muted focus:border-primary-500 focus:outline-none transition-colors resize-none"
+                                      placeholder="Define the AI's personality, role, and behavior guidelines..."></textarea>
+                            <p class="mt-2 text-xs text-dark-muted">This defines how your AI will respond. Be specific about its role, tone, and limitations.</p>
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-dark-text mb-2">Welcome Message (First Reply)</label>
+                            <textarea v-model="form.welcome_message" rows="3"
+                                      class="w-full px-4 py-3 bg-dark-bg border border-dark-border rounded-xl text-white placeholder-dark-muted focus:border-primary-500 focus:outline-none transition-colors resize-none"
+                                      placeholder="Hello! Thanks for reaching out. How can I help you today?"></textarea>
+                            <p class="mt-2 text-xs text-dark-muted">This message is sent as the first response to new conversations. Leave empty to use AI-generated response.</p>
+                        </div>
+
+                        <div v-if="!isCreating" class="flex items-center gap-3 p-4 bg-dark-bg rounded-xl">
+                            <label class="relative inline-flex items-center cursor-pointer">
+                                <input type="checkbox" v-model="form.is_active" class="sr-only peer">
+                                <div class="w-11 h-6 bg-dark-border peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary-600"></div>
+                            </label>
+                            <div>
+                                <span class="text-sm font-medium text-white">Agent Active</span>
+                                <p class="text-xs text-dark-muted">When disabled, the agent won't respond to messages</p>
+                            </div>
     </div>
 
-    <div class="ui horizontal divider">
-        Send
+                        <!-- Integrations Section (only for editing) -->
+                        <div v-if="!isCreating && selectedAgent" class="pt-6 border-t border-dark-border">
+                            <h3 class="text-lg font-semibold text-white mb-4">Integrations</h3>
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <!-- WhatsApp -->
+                                <div class="p-4 bg-dark-bg rounded-xl border border-dark-border">
+                                    <div class="flex items-center gap-3 mb-3">
+                                        <span class="text-2xl">📱</span>
+                                        <div>
+                                            <h4 class="font-medium text-white">WhatsApp</h4>
+                                            <span class="text-xs" :class="hasIntegration('whatsapp') ? 'text-green-400' : 'text-dark-muted'">
+                                                {{ hasIntegration('whatsapp') ? 'Connected' : 'Not connected' }}
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <button v-if="!hasIntegration('whatsapp')" @click="connectIntegration('whatsapp')" type="button"
+                                            class="w-full py-2 bg-green-600 hover:bg-green-500 text-white text-sm font-medium rounded-lg transition-colors">
+                                        Connect
+                                    </button>
+                                    <button v-else @click="disconnectIntegration('whatsapp')" type="button"
+                                            class="w-full py-2 bg-red-600/20 hover:bg-red-600/30 text-red-400 text-sm font-medium rounded-lg transition-colors">
+                                        Disconnect
+                                    </button>
     </div>
 
-    <div class="ui three column doubling grid cards">
-        <send-message></send-message>
-        <send-image></send-image>
-        <send-file max-file-size="{{ .MaxFileSize }}"></send-file>
-
-        <send-video max-video-size="{{ .MaxVideoSize }}"></send-video>
-        <send-sticker></send-sticker>
-        <send-contact></send-contact>
-
-        <send-location></send-location>
-        <send-audio></send-audio>
-        <send-poll></send-poll>
-        
-        <send-presence></send-presence>
-        
-        <send-chat-presence></send-chat-presence>
-        <send-link></send-link>
+                                <!-- Telegram -->
+                                <div class="p-4 bg-dark-bg rounded-xl border border-dark-border">
+                                    <div class="flex items-center gap-3 mb-3">
+                                        <span class="text-2xl">✈️</span>
+                                        <div>
+                                            <h4 class="font-medium text-white">Telegram</h4>
+                                            <span class="text-xs" :class="hasIntegration('telegram') ? 'text-green-400' : 'text-dark-muted'">
+                                                {{ hasIntegration('telegram') ? 'Connected' : 'Not connected' }}
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <button v-if="!hasIntegration('telegram')" @click="connectIntegration('telegram')" type="button"
+                                            class="w-full py-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium rounded-lg transition-colors">
+                                        Connect
+                                    </button>
+                                    <button v-else @click="disconnectIntegration('telegram')" type="button"
+                                            class="w-full py-2 bg-red-600/20 hover:bg-red-600/30 text-red-400 text-sm font-medium rounded-lg transition-colors">
+                                        Disconnect
+                                    </button>
     </div>
 
-    <div class="ui horizontal divider">
-        Message
+                                <!-- Instagram -->
+                                <div class="p-4 bg-dark-bg rounded-xl border border-dark-border">
+                                    <div class="flex items-center gap-3 mb-3">
+                                        <span class="text-2xl">📷</span>
+                                        <div>
+                                            <h4 class="font-medium text-white">Instagram</h4>
+                                            <span class="text-xs" :class="hasIntegration('instagram') ? 'text-green-400' : 'text-dark-muted'">
+                                                {{ hasIntegration('instagram') ? 'Connected' : 'Not connected' }}
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <button v-if="!hasIntegration('instagram')" @click="connectIntegration('instagram')" type="button"
+                                            class="w-full py-2 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white text-sm font-medium rounded-lg transition-colors">
+                                        Connect
+                                    </button>
+                                    <button v-else @click="disconnectIntegration('instagram')" type="button"
+                                            class="w-full py-2 bg-red-600/20 hover:bg-red-600/30 text-red-400 text-sm font-medium rounded-lg transition-colors">
+                                        Disconnect
+                                    </button>
+                                </div>
+                            </div>
     </div>
 
-    <div class="ui three column doubling grid cards">
-        <message-delete></message-delete>
-        <message-revoke></message-revoke>
-        <message-react></message-react>
-        <message-update></message-update>
-        <message-read></message-read>
+                        <!-- Actions -->
+                        <div class="flex items-center gap-4 pt-6">
+                            <button type="submit" :disabled="saving"
+                                    class="flex-1 py-3 bg-gradient-to-r from-primary-600 to-primary-500 hover:from-primary-500 hover:to-primary-400 text-white font-medium rounded-xl transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed">
+                                {{ saving ? 'Saving...' : (isCreating ? 'Create Agent' : 'Save Changes') }}
+                            </button>
+                            <button v-if="!isCreating" @click="confirmDelete" type="button"
+                                    class="px-6 py-3 bg-red-600/20 hover:bg-red-600/30 text-red-400 font-medium rounded-xl transition-colors">
+                                Delete
+                            </button>
+                        </div>
+                    </form>
+                </div>
     </div>
 
-    <div class="ui horizontal divider">
-        Group
+            <!-- WhatsApp QR Modal -->
+            <div v-if="showQRModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
+                <div class="glass rounded-2xl p-8 max-w-md w-full mx-4 animate-slide-up">
+                    <div class="text-center">
+                        <h3 class="text-xl font-bold text-white mb-2">Connect WhatsApp</h3>
+                        <p class="text-dark-muted mb-6">Scan this QR code with your WhatsApp app</p>
+                        
+                        <div v-if="qrLoading" class="py-12">
+                            <div class="w-12 h-12 border-4 border-primary-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
+                            <p class="text-dark-muted mt-4">Generating QR code...</p>
     </div>
 
-    <div class="ui three column doubling grid cards">
-        <group-list :connected="connected_devices"></group-list>
-        <group-create></group-create>
-        <group-join-with-link></group-join-with-link>
-        <group-info-from-link></group-info-from-link>
-        <group-add-participants></group-add-participants>
-        <group-set-photo></group-set-photo>
-        <group-set-name></group-set-name>
-        <group-set-locked></group-set-locked>
-        <group-set-announce></group-set-announce>
-        <group-set-topic></group-set-topic>
-        <group-get-invite-link></group-get-invite-link>
-        <group-info></group-info>
+                        <div v-else-if="qrCode" class="bg-white p-4 rounded-xl inline-block mb-6">
+                            <img :src="qrCode" alt="WhatsApp QR Code" class="w-64 h-64">
     </div>
 
-    <div class="ui horizontal divider">
-        Newsletter
+                        <div v-else class="py-12">
+                            <p class="text-red-400">Failed to generate QR code</p>
     </div>
 
-    <div class="ui three column doubling grid cards">
-        <newsletter-list></newsletter-list>
+                        <div class="flex gap-4">
+                            <button @click="showQRModal = false" class="flex-1 py-3 bg-dark-border hover:bg-dark-muted/20 text-white font-medium rounded-xl transition-colors">
+                                Cancel
+                            </button>
+                            <button @click="refreshQR" class="flex-1 py-3 bg-primary-600 hover:bg-primary-500 text-white font-medium rounded-xl transition-colors">
+                                Refresh QR
+                            </button>
+                        </div>
+                    </div>
+                </div>
     </div>
 
-    <div class="ui horizontal divider">
-        Account
+            <!-- Telegram Bot Token Modal -->
+            <div v-if="showTelegramModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
+                <div class="glass rounded-2xl p-8 max-w-md w-full mx-4 animate-slide-up">
+                    <h3 class="text-xl font-bold text-white mb-2">Connect Telegram Bot</h3>
+                    <p class="text-dark-muted mb-6">Enter your Telegram Bot Token from @BotFather</p>
+                    
+                    <input v-model="telegramToken" type="text"
+                           class="w-full px-4 py-3 bg-dark-bg border border-dark-border rounded-xl text-white font-mono placeholder-dark-muted focus:border-primary-500 focus:outline-none transition-colors mb-6"
+                           placeholder="123456789:ABCdefGHIjklMNOpqrsTUVwxyz">
+                    
+                    <div class="flex gap-4">
+                        <button @click="showTelegramModal = false" class="flex-1 py-3 bg-dark-border hover:bg-dark-muted/20 text-white font-medium rounded-xl transition-colors">
+                            Cancel
+                        </button>
+                        <button @click="submitTelegramToken" :disabled="!telegramToken" class="flex-1 py-3 bg-blue-600 hover:bg-blue-500 text-white font-medium rounded-xl transition-colors disabled:opacity-50">
+                            Connect
+                        </button>
+                    </div>
+                </div>
     </div>
 
-    <div class="ui three column doubling grid cards">
-        <account-avatar></account-avatar>
-        <account-change-avatar></account-change-avatar>
-        <account-change-push-name></account-change-push-name>
-        <account-user-info></account-user-info>
-        <account-business-profile></account-business-profile>
-        <account-privacy></account-privacy>
-        <account-contact></account-contact>
-        <account-user-check></account-user-check>
+            <!-- Toast Notification -->
+            <div v-if="toast.show" 
+                 class="fixed bottom-6 right-6 z-50 animate-slide-up"
+                 :class="toast.type === 'error' ? 'bg-red-600' : 'bg-green-600'"
+                 style="padding: 1rem 1.5rem; border-radius: 0.75rem; box-shadow: 0 10px 40px rgba(0,0,0,0.3);">
+                <p class="text-white font-medium">{{ toast.message }}</p>
+            </div>
+        </main>
     </div>
 
-    <div class="ui horizontal divider">
-        Chat Management
-    </div>
-
-    <div class="ui three column doubling grid cards">
-        <chat-pin-manager></chat-pin-manager>
-        <chat-disappearing-manager></chat-disappearing-manager>
-        <chat-list></chat-list>
-        <chat-messages></chat-messages>
-    </div>
-
-</div>
 <script>
-    window.TYPEGROUP = "@g.us";
-    window.TYPEUSER = "@s.whatsapp.net";
-    window.TYPENEWSLETTER = "@newsletter";
-    window.TYPESTATUS = "status@broadcast";
-    window.showErrorInfo = (message) => {
-        $('body').toast({
-            position: 'bottom right',
-            title: 'Error',
-            message: message,
-            showProgress: 'bottom',
-            classProgress: 'red'
-        });
-    }
-    window.showSuccessInfo = (message) => {
-        $('body').toast({
-            position: 'bottom right',
-            title: 'Success',
-            message: message,
-            showProgress: 'bottom',
-            classProgress: 'green'
-        });
-    }
+        const { createApp, ref, reactive, computed, onMounted } = Vue;
 
+        createApp({
+            setup() {
+                const agents = ref([]);
+                const selectedAgent = ref(null);
+                const isCreating = ref(false);
+                const saving = ref(false);
+                const showApiKey = ref(false);
+                const showQRModal = ref(false);
+                const showTelegramModal = ref(false);
+                const qrCode = ref('');
+                const qrLoading = ref(false);
+                const telegramToken = ref('');
+                
+                const form = reactive({
+                    name: '',
+                    description: '',
+                    api_key: '',
+                    model: 'gpt-4o-mini',
+                    system_prompt: '',
+                    welcome_message: '',
+                    is_active: true
+                });
 
-    const baseHost = `${window.location.protocol}//${window.location.hostname}${window.location.port ? ':' + window.location.port : ''}`;
-    const DEVICE_ID_HEADER = 'X-Device-Id';
-    window.http = axios.create({
-        baseURL: `${baseHost}{{ .AppBasePath }}`
-    });
-    {{ if isEnableBasicAuth .BasicAuthToken }}
-    window.http.defaults.headers.common['Authorization'] = "{{ .BasicAuthToken }}";
-    {{ end }}
-</script>
-<script type="module">
-    import AppLogin from "{{ .AppBasePath }}/components/AppLogin.js";
-    import AppLoginWithCode from "{{ .AppBasePath }}/components/AppLoginWithCode.js";
-    import AppLogout from "{{ .AppBasePath }}/components/AppLogout.js";
-    import AppReconnect from "{{ .AppBasePath }}/components/AppReconnect.js";
-    import SendMessage from "{{ .AppBasePath }}/components/SendMessage.js";
-    import SendImage from "{{ .AppBasePath }}/components/SendImage.js";
-    import SendFile from "{{ .AppBasePath }}/components/SendFile.js";
-    import SendVideo from "{{ .AppBasePath }}/components/SendVideo.js";
-    import SendSticker from "{{ .AppBasePath }}/components/SendSticker.js";
-    import SendLink from "{{ .AppBasePath }}/components/SendLink.js";
-    import SendContact from "{{ .AppBasePath }}/components/SendContact.js";
-    import SendLocation from "{{ .AppBasePath }}/components/SendLocation.js";
-    import SendAudio from "{{ .AppBasePath }}/components/SendAudio.js";
-    import SendPoll from "{{ .AppBasePath }}/components/SendPoll.js";
-    import SendPresence from "{{ .AppBasePath }}/components/SendPresence.js";
-    import SendChatPresence from "{{ .AppBasePath }}/components/SendChatPresence.js";
-    import MessageDelete from "{{ .AppBasePath }}/components/MessageDelete.js";
-    import MessageUpdate from "{{ .AppBasePath }}/components/MessageUpdate.js";
-    import MessageReact from "{{ .AppBasePath }}/components/MessageReact.js";
-    import MessageRevoke from "{{ .AppBasePath }}/components/MessageRevoke.js";
-    import MessageRead from "{{ .AppBasePath }}/components/MessageRead.js";
-    import GroupList from "{{ .AppBasePath }}/components/GroupList.js";
-    import GroupCreate from "{{ .AppBasePath }}/components/GroupCreate.js";
-    import GroupJoinWithLink from "{{ .AppBasePath }}/components/GroupJoinWithLink.js";
-    import GroupInfoFromLink from "{{ .AppBasePath }}/components/GroupInfoFromLink.js";
-    import GroupAddParticipants from "{{ .AppBasePath }}/components/GroupManageParticipants.js";
-    import GroupSetPhoto from "{{ .AppBasePath }}/components/GroupSetPhoto.js";
-    import GroupSetName from "{{ .AppBasePath }}/components/GroupSetName.js";
-    import GroupSetLocked from "{{ .AppBasePath }}/components/GroupSetLocked.js";
-    import GroupSetAnnounce from "{{ .AppBasePath }}/components/GroupSetAnnounce.js";
-    import GroupSetTopic from "{{ .AppBasePath }}/components/GroupSetTopic.js";
-    import GroupGetInviteLink from "{{ .AppBasePath }}/components/GroupGetInviteLink.js";
-    import GroupInfo from "{{ .AppBasePath }}/components/GroupInfo.js";
-    import NewsletterList from "{{ .AppBasePath }}/components/NewsletterList.js";
-    import AccountAvatar from "{{ .AppBasePath }}/components/AccountAvatar.js";
-    import AccountChangeAvatar from "{{ .AppBasePath }}/components/AccountChangeAvatar.js";
-    import AccountChangePushName from "{{ .AppBasePath }}/components/AccountChangePushName.js";
-    import AccountUserInfo from "{{ .AppBasePath }}/components/AccountUserInfo.js";
-    import AccountPrivacy from "{{ .AppBasePath }}/components/AccountPrivacy.js";
-    import AccountContact from "{{ .AppBasePath }}/components/AccountContact.js";
-    import AccountUserCheck from "{{ .AppBasePath }}/components/AccountUserCheck.js";
-    import AccountBusinessProfile from "{{ .AppBasePath }}/components/AccountBusinessProfile.js";
-    import ChatPinManager from "{{ .AppBasePath }}/components/ChatPinManager.js";
-    import ChatDisappearingManager from "{{ .AppBasePath }}/components/ChatDisappearingManager.js";
-    import ChatList from "{{ .AppBasePath }}/components/ChatList.js";
-    import ChatMessages from "{{ .AppBasePath }}/components/ChatMessages.js";
-    import DeviceManager from "{{ .AppBasePath }}/components/DeviceManager.js";
-    import AIChatbotConfig from "{{ .AppBasePath }}/components/AIChatbotConfig.js";
+                const toast = reactive({
+                    show: false,
+                    message: '',
+                    type: 'success'
+                });
 
-    const showErrorInfo = (message) => {
-        $('body').toast({
-            position: 'bottom right',
-            title: 'Error',
-            message: message,
-            showProgress: 'bottom',
-            classProgress: 'red'
-        });
-    }
-    const showSuccessInfo = (message) => {
-        $('body').toast({
-            position: 'bottom right',
-            title: 'Success',
-            message: message,
-            showProgress: 'bottom',
-            classProgress: 'green'
-        });
-    }
-
-    Vue.createApp({
-        components: {
-            AppLogin, AppLoginWithCode, AppLogout, AppReconnect,
-            SendMessage, SendImage, SendFile, SendVideo, SendSticker, SendLink, SendContact, SendLocation, SendAudio, SendPoll, SendPresence, SendChatPresence,
-            MessageDelete, MessageUpdate, MessageReact, MessageRevoke, MessageRead,
-            GroupList, GroupCreate, GroupJoinWithLink, GroupInfoFromLink, GroupAddParticipants, GroupSetPhoto, GroupSetName, GroupSetLocked, GroupSetAnnounce, GroupSetTopic, GroupGetInviteLink, GroupInfo,
-            NewsletterList,
-            AccountAvatar, AccountUserInfo, AccountPrivacy, AccountChangeAvatar, AccountContact, AccountChangePushName, AccountUserCheck, AccountBusinessProfile,
-            ChatPinManager, ChatDisappearingManager, ChatList, ChatMessages,
-            DeviceManager,
-            AIChatbotConfig
-        },
-        delimiters: ['[[', ']]'],
-        data() {
-            return {
-                app_ws: null,
-                connected_devices: null,
-                deviceList: [],
-                selectedDeviceId: '',
-            }
-        },
-        computed: {
-            selectedDevice() {
-                if (!this.selectedDeviceId) return null;
-                return this.deviceList.find(d => (d.id || d.device) === this.selectedDeviceId) || null;
-            },
-            isSelectedDeviceLoggedIn() {
-                return this.selectedDevice?.state === 'logged_in';
-            },
-        },
-        methods: {
-            applyDeviceHeader(id) {
-                if (id) {
-                    window.http.defaults.headers.common[DEVICE_ID_HEADER] = encodeURIComponent(id);
-                } else {
-                    delete window.http.defaults.headers.common[DEVICE_ID_HEADER];
-                    if (this.app_ws) {
-                        this.app_ws.close();
-                        this.app_ws = null;
-                    }
-                }
-            },
-            constructWebSocketURL() {
-                if (!this.selectedDeviceId) return '';
-                const protocol = location.protocol === 'https:' ? 'wss://' : 'ws://';
-                const basePath = '{{ .AppBasePath }}';
-                const deviceQuery = encodeURIComponent(this.selectedDeviceId);
-                const pathPrefix = basePath || '';
-                return `${protocol}${location.host}${pathPrefix}/ws?device_id=${deviceQuery}`;
-            },
-            handleReloadDevice() {
-                if (this.$refs.deviceManager) {
-                    this.$refs.deviceManager.refresh();
-                }
-                if (this.app_ws) {
-                    this.app_ws.send(JSON.stringify({"code": "FETCH_DEVICES"}));
-                }
-            },
-            handleDeviceSelected(id) {
-                this.selectedDeviceId = id;
-                this.applyDeviceHeader(id);
-                if (id) {
-                    this.connectWebSocket();
-                }
-            },
-            handleDevicesUpdated(devices) {
-                this.deviceList = devices;
-                this.connected_devices = devices;
-            },
-            connectWebSocket() {
-                if (!this.selectedDeviceId) {
-                    return;
-                }
-
-                if (this.app_ws) {
-                    this.app_ws.close();
-                    this.app_ws = null;
-                }
-
-                const wsURL = this.constructWebSocketURL();
-                if (!wsURL) {
-                    return;
-                }
-
-                this.app_ws = new WebSocket(wsURL);
-
-                this.app_ws.onopen = (evt) => {
-                    this.handleReloadDevice();
+                const showToast = (message, type = 'success') => {
+                    toast.message = message;
+                    toast.type = type;
+                    toast.show = true;
+                    setTimeout(() => { toast.show = false; }, 3000);
                 };
 
-                this.app_ws.onerror = (error) => {
-                    console.error('WebSocket error:', error);
-                    // Only show error notification if the device is logged in
-                    if (this.isSelectedDeviceLoggedIn) {
-                        showErrorInfo('Connection error occurred. Please refresh or re-select the device.');
+                const loadAgents = async () => {
+                    try {
+                        const response = await axios.get('/api/agents');
+                        agents.value = response.data.results || [];
+                    } catch (error) {
+                        console.error('Failed to load agents:', error);
+                        showToast('Failed to load agents', 'error');
                     }
                 };
 
-                this.app_ws.onmessage = (evt) => {
-                    const message = JSON.parse(evt.data)
-                    switch (message.code) {
-                        case 'LOGIN_SUCCESS':
-                            showSuccessInfo(message.message)
-                            $('#modalLogin').modal('hide');
+                const startCreating = () => {
+                    isCreating.value = true;
+                    selectedAgent.value = null;
+                    Object.assign(form, {
+                        name: '',
+                        description: '',
+                        api_key: '',
+                        model: 'gpt-4o-mini',
+                        system_prompt: '',
+                        welcome_message: '',
+                        is_active: true
+                    });
+                };
 
-                            // fetch devices
-                            this.handleReloadDevice()
-                            break;
-                        case 'LIST_DEVICES':
-                            this.connected_devices = message.result
-                            break;
-                        case 'LOGOUT_COMPLETE':
-                            // Handle successful cleanup after remote logout
-                            showSuccessInfo('✅ ' + message.message)
-                            console.log('[LOGOUT_COMPLETE] Remote logout cleanup completed:', message)
-                            // Optionally refresh the device list
-                            this.handleReloadDevice()
-                            break;
-                        case 'DEVICE_REMOVED': {
-                            const removedId = message.result?.device_id;
-                            const devices = message.result?.devices;
-                            showSuccessInfo('✅ ' + (message.message || 'Device removed'));
+                const selectAgent = async (agent) => {
+                    try {
+                        const response = await axios.get(`/api/agents/${agent.id}`);
+                        selectedAgent.value = response.data.results;
+                        isCreating.value = false;
+                        Object.assign(form, {
+                            name: selectedAgent.value.name,
+                            description: selectedAgent.value.description,
+                            api_key: '', // Don't show actual key
+                            model: selectedAgent.value.model,
+                            system_prompt: selectedAgent.value.system_prompt,
+                            welcome_message: selectedAgent.value.welcome_message,
+                            is_active: selectedAgent.value.is_active
+                        });
+                    } catch (error) {
+                        showToast('Failed to load agent details', 'error');
+                    }
+                };
 
-                            if (Array.isArray(devices)) {
-                                this.deviceList = devices;
-                                this.connected_devices = devices;
+                const goBack = () => {
+                    selectedAgent.value = null;
+                    isCreating.value = false;
+                };
 
-                                if (removedId && this.selectedDeviceId === removedId) {
-                                    this.selectedDeviceId = '';
-                                    this.applyDeviceHeader('');
-                                }
-
-                                if (!this.selectedDeviceId && this.deviceList.length > 0) {
-                                    const first = this.deviceList[0].id || this.deviceList[0].device;
-                                    this.setDeviceContext(first);
-                                }
-                            } else {
-                                this.handleReloadDevice();
+                const saveAgent = async () => {
+                    saving.value = true;
+                    try {
+                        if (isCreating.value) {
+                            await axios.post('/api/agents', form);
+                            showToast('Agent created successfully');
+                        } else {
+                            const updateData = { ...form };
+                            if (updateData.api_key === '') {
+                                delete updateData.api_key;
                             }
-                            break;
+                            await axios.put(`/api/agents/${selectedAgent.value.id}`, updateData);
+                            showToast('Agent updated successfully');
                         }
-                        default:
-                            console.log(message)
+                        await loadAgents();
+                        goBack();
+                    } catch (error) {
+                        showToast(error.response?.data?.message || 'Failed to save agent', 'error');
+                    } finally {
+                        saving.value = false;
                     }
                 };
-            },
-        },
-        mounted() {
-            // Show app container and hide splash once initial data fetched
-            setTimeout(() => {
-                document.getElementById('app').style.display = 'block';
-                document.getElementById('splash-screen').classList.add('fade-out');
-            }, 800);
-        },
-    }).mount('#app')
+
+                const confirmDelete = async () => {
+                    if (!confirm('Are you sure you want to delete this agent? This action cannot be undone.')) return;
+                    
+                    try {
+                        await axios.delete(`/api/agents/${selectedAgent.value.id}`);
+                        showToast('Agent deleted successfully');
+                        await loadAgents();
+                        goBack();
+                    } catch (error) {
+                        showToast('Failed to delete agent', 'error');
+                    }
+                };
+
+                const hasIntegration = (type) => {
+                    return selectedAgent.value?.integrations?.some(i => i.type === type);
+                };
+
+                const getIntegration = (type) => {
+                    return selectedAgent.value?.integrations?.find(i => i.type === type);
+                };
+
+                const connectIntegration = async (type) => {
+                    if (type === 'whatsapp') {
+                        showQRModal.value = true;
+                        await generateQR();
+                    } else if (type === 'telegram') {
+                        telegramToken.value = '';
+                        showTelegramModal.value = true;
+                    } else if (type === 'instagram') {
+                        showToast('Instagram integration coming soon', 'error');
+                    }
+                };
+
+                const generateQR = async () => {
+                    qrLoading.value = true;
+                    try {
+                        // First create the integration
+                        await axios.post(`/api/agents/${selectedAgent.value.id}/integrations/whatsapp`);
+                        
+                        // Then get QR code from WhatsApp login endpoint
+                        const response = await axios.get('/api/app/login');
+                        qrCode.value = response.data.results?.qr_link || '';
+                    } catch (error) {
+                        console.error('QR generation error:', error);
+                        qrCode.value = '';
+                    } finally {
+                        qrLoading.value = false;
+                    }
+                };
+
+                const refreshQR = () => {
+                    generateQR();
+                };
+
+                const submitTelegramToken = async () => {
+                    try {
+                        await axios.post(`/api/agents/${selectedAgent.value.id}/integrations/telegram`, {
+                            bot_token: telegramToken.value
+                        });
+                        showToast('Telegram bot connected');
+                        showTelegramModal.value = false;
+                        await selectAgent(selectedAgent.value);
+                    } catch (error) {
+                        showToast('Failed to connect Telegram bot', 'error');
+                    }
+                };
+
+                const disconnectIntegration = async (type) => {
+                    const integration = getIntegration(type);
+                    if (!integration) return;
+                    
+                    if (!confirm(`Disconnect ${type}?`)) return;
+                    
+                    try {
+                        await axios.delete(`/api/agents/${selectedAgent.value.id}/integrations/${integration.id}`);
+                        showToast(`${type} disconnected`);
+                        await selectAgent(selectedAgent.value);
+                    } catch (error) {
+                        showToast('Failed to disconnect', 'error');
+                    }
+                };
+
+                onMounted(() => {
+                    loadAgents();
+                });
+
+                return {
+                    agents,
+                    selectedAgent,
+                    isCreating,
+                    saving,
+                    showApiKey,
+                    form,
+                    toast,
+                    showQRModal,
+                    showTelegramModal,
+                    qrCode,
+                    qrLoading,
+                    telegramToken,
+                    startCreating,
+                    selectAgent,
+                    goBack,
+                    saveAgent,
+                    confirmDelete,
+                    hasIntegration,
+                    connectIntegration,
+                    disconnectIntegration,
+                    refreshQR,
+                    submitTelegramToken
+                };
+            }
+        }).mount('#app');
 </script>
 </body>
 </html>
