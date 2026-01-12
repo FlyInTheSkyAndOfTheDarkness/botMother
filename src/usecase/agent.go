@@ -284,3 +284,14 @@ func (s *AgentService) DeleteIntegration(ctx context.Context, integrationID stri
 	return s.repo.DeleteIntegration(ctx, integrationID)
 }
 
+// UpdateIntegrationConfig updates integration config and connection status
+func (s *AgentService) UpdateIntegrationConfig(ctx context.Context, integrationID, config string, isConnected bool) error {
+	integration, err := s.repo.GetIntegrationByID(ctx, integrationID)
+	if err != nil {
+		return err
+	}
+	integration.Config = config
+	integration.IsConnected = isConnected
+	return s.repo.UpdateIntegration(ctx, integration)
+}
+

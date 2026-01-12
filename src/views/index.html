@@ -770,14 +770,21 @@
 
                 const submitTelegramToken = async () => {
                     try {
-                        await axios.post(`/api/agents/${selectedAgent.value.id}/integrations/telegram`, {
+                        // First, create or get the integration
+                        const createResp = await axios.post(`/api/agents/${selectedAgent.value.id}/integrations/telegram`);
+                        const integration = createResp.data.results;
+                        
+                        // Then connect with the bot token
+                        await axios.post(`/api/agents/${selectedAgent.value.id}/integrations/${integration.id}/connect`, {
                             bot_token: telegramToken.value
                         });
-                        showToast('Telegram bot connected');
+                        
+                        showToast('Telegram bot connected and started!');
                         showTelegramModal.value = false;
                         await selectAgent(selectedAgent.value);
                     } catch (error) {
-                        showToast('Failed to connect Telegram bot', 'error');
+                        console.error('Telegram connect error:', error);
+                        showToast('Failed to connect Telegram bot: ' + (error.response?.data?.message || error.message), 'error');
                     }
                 };
 

@@ -1,7 +1,10 @@
 package rest
 
 import (
+	"encoding/json"
+	
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/domains/agent"
+	telegramBot "github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/telegram"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/pkg/utils"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/usecase"
 	"github.com/gofiber/fiber/v2"
@@ -24,6 +27,8 @@ func InitRestAgent(app fiber.Router, service *usecase.AgentService) AgentHandler
 	// Integration endpoints
 	app.Post("/agents/:id/integrations/:type", handler.CreateIntegration)
 	app.Delete("/agents/:id/integrations/:integrationId", handler.DeleteIntegration)
+	app.Post("/agents/:id/integrations/:integrationId/connect", handler.ConnectIntegration)
+	app.Post("/agents/:id/integrations/:integrationId/disconnect", handler.DisconnectIntegration)
 
 	return handler
 }
@@ -186,6 +191,11 @@ func (h *AgentHandler) DeleteIntegration(c *fiber.Ctx) error {
 		return fiber.NewError(fiber.StatusBadRequest, "Integration ID is required")
 	}
 
+	// Stop Telegram bot if running
+	if botMgr := telegramBot.GetBotManager(); botMgr != nil {
+		botMgr.StopBot(integrationID)
+	}
+
 	if err := h.Service.DeleteIntegration(c.UserContext(), integrationID); err != nil {
 		return fiber.NewError(fiber.StatusInternalServerError, err.Error())
 	}
@@ -194,6 +204,101 @@ func (h *AgentHandler) DeleteIntegration(c *fiber.Ctx) error {
 		Status:  200,
 		Code:    "SUCCESS",
 		Message: "Integration deleted successfully",
+		Results: nil,
+	})
+}
+
+// ConnectIntegration connects an integration (e.g., starts Telegram bot)
+func (h *AgentHandler) ConnectIntegration(c *fiber.Ctx) error {
+	agentID := c.Params("id")
+	integrationID := c.Params("integrationId")
+	
+	if agentID == "" || integrationID == "" {
+		return fiber.NewError(fiber.StatusBadRequest, "Agent ID and Integration ID are required")
+	}
+
+	// Get config from body
+	var configBody map[string]interface{}
+	if err := c.BodyParser(&configBody); err != nil {
+		return fiber.NewError(fiber.StatusBadRequest, "Invalid request body")
+	}
+
+	// Get integration
+	integration, err := h.Service.GetIntegration(c.UserContext(), integrationID)
+	if err != nil {
+		return fiber.NewError(fiber.StatusNotFound, "Integration not found")
+	}
+
+	// Handle based on integration type
+	switch integration.Type {
+	case agent.IntegrationTypeTelegram:
+		botToken, ok := configBody["bot_token"].(string)
+		if !ok || botToken == "" {
+			return fiber.NewError(fiber.StatusBadRequest, "bot_token is required for Telegram")
+		}
+
+		// Update integration config
+		config := agent.TelegramConfig{BotToken: botToken}
+		configJSON, _ := json.Marshal(config)
+		
+		if err := h.Service.UpdateIntegrationConfig(c.UserContext(), integrationID, string(configJSON), true); err != nil {
+			return fiber.NewError(fiber.StatusInternalServerError, err.Error())
+		}
+
+		// Start Telegram bot
+		if botMgr := telegramBot.GetBotManager(); botMgr != nil {
+			if err := botMgr.StartBot(integrationID, agentID, botToken); err != nil {
+				return fiber.NewError(fiber.StatusInternalServerError, "Failed to start Telegram bot: "+err.Error())
+			}
+		}
+
+	case agent.IntegrationTypeWhatsApp:
+		// WhatsApp connection handled separately via QR
+		if err := h.Service.UpdateIntegrationConfig(c.UserContext(), integrationID, integration.Config, true); err != nil {
+			return fiber.NewError(fiber.StatusInternalServerError, err.Error())
+		}
+
+	case agent.IntegrationTypeInstagram:
+		// Instagram requires OAuth - placeholder
+		return fiber.NewError(fiber.StatusNotImplemented, "Instagram integration not yet implemented")
+	}
+
+	return c.JSON(utils.ResponseData{
+		Status:  200,
+		Code:    "SUCCESS",
+		Message: "Integration connected successfully",
+		Results: nil,
+	})
+}
+
+// DisconnectIntegration disconnects an integration
+func (h *AgentHandler) DisconnectIntegration(c *fiber.Ctx) error {
+	integrationID := c.Params("integrationId")
+	if integrationID == "" {
+		return fiber.NewError(fiber.StatusBadRequest, "Integration ID is required")
+	}
+
+	integration, err := h.Service.GetIntegration(c.UserContext(), integrationID)
+	if err != nil {
+		return fiber.NewError(fiber.StatusNotFound, "Integration not found")
+	}
+
+	// Stop services based on type
+	if integration.Type == agent.IntegrationTypeTelegram {
+		if botMgr := telegramBot.GetBotManager(); botMgr != nil {
+			botMgr.StopBot(integrationID)
+		}
+	}
+
+	// Update integration status
+	if err := h.Service.UpdateIntegrationConfig(c.UserContext(), integrationID, integration.Config, false); err != nil {
+		return fiber.NewError(fiber.StatusInternalServerError, err.Error())
+	}
+
+	return c.JSON(utils.ResponseData{
+		Status:  200,
+		Code:    "SUCCESS",
+		Message: "Integration disconnected successfully",
 		Results: nil,
 	})
 }

@@ -28,6 +28,7 @@ import (
 	domainSend "github.com/aldinokemal/go-whatsapp-web-multidevice/domains/send"
 	domainUser "github.com/aldinokemal/go-whatsapp-web-multidevice/domains/user"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/chatstorage"
+	telegramBot "github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/telegram"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/whatsapp"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/pkg/utils"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/usecase"
@@ -401,6 +402,14 @@ func initApp() {
 		// Initialize WhatsApp message handler for agents
 		whatsapp.InitAgentHandler(agentRepository)
 		logrus.Info("Agent service initialized successfully")
+		
+		// Initialize Telegram bot manager
+		telegramBot.InitBotManager(agentService)
+		if err := telegramBot.GetBotManager().LoadBotsFromDB(ctx, agentRepository); err != nil {
+			logrus.Warnf("failed to load Telegram bots: %v", err)
+		} else {
+			logrus.Info("Telegram bot manager initialized")
+		}
 	}
 	
 	// Initialize Flow service for Flow Builder
