@@ -44,7 +44,7 @@ func (s *KnowledgeService) UploadDocument(ctx context.Context, req knowledge.Cre
 
 func (s *KnowledgeService) processDocument(ctx context.Context, doc *knowledge.Document) {
 	// Get agent to get API key
-	agent, err := s.agentService.GetAgent(ctx, doc.AgentID)
+	agent, err := s.agentService.GetAgentInternal(ctx, doc.AgentID)
 	if err != nil {
 		doc.Status = "error"
 		doc.Error = "Failed to get agent: " + err.Error()
@@ -145,7 +145,7 @@ func (s *KnowledgeService) DeleteDocument(ctx context.Context, id string) error 
 
 func (s *KnowledgeService) Search(ctx context.Context, req knowledge.SearchRequest) ([]knowledge.SearchResult, error) {
 	// Get agent for API key
-	agent, err := s.agentService.GetAgent(ctx, req.AgentID)
+	agent, err := s.agentService.GetAgentInternal(ctx, req.AgentID)
 	if err != nil {
 		return nil, err
 	}

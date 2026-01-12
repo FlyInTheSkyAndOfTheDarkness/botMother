@@ -51,6 +51,11 @@ func (s *AgentService) GetAgent(ctx context.Context, id string) (*agent.AgentRes
 	return s.agentToResponse(ctx, a)
 }
 
+// GetAgentInternal returns the full agent with API key (for internal use only)
+func (s *AgentService) GetAgentInternal(ctx context.Context, id string) (*agent.Agent, error) {
+	return s.repo.GetByID(ctx, id)
+}
+
 func (s *AgentService) GetAllAgents(ctx context.Context) ([]*agent.AgentResponse, error) {
 	agents, err := s.repo.GetAll(ctx)
 	if err != nil {
