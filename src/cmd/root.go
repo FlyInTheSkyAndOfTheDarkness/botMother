@@ -13,6 +13,7 @@ import (
 
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/config"
 	agentRepo "github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/agent"
+	flowRepo "github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/flow"
 	domainApp "github.com/aldinokemal/go-whatsapp-web-multidevice/domains/app"
 	domainChat "github.com/aldinokemal/go-whatsapp-web-multidevice/domains/chat"
 	domainChatStorage "github.com/aldinokemal/go-whatsapp-web-multidevice/domains/chatstorage"
@@ -57,6 +58,9 @@ var (
 	
 	// Agent service for AI Agents Platform
 	agentService *usecase.AgentService
+	
+	// Flow service for Flow Builder
+	flowService *usecase.FlowService
 )
 
 // rootCmd represents the base command when called without any subcommands
@@ -378,6 +382,15 @@ func initApp() {
 		// Initialize WhatsApp message handler for agents
 		whatsapp.InitAgentHandler(agentRepository)
 		logrus.Info("Agent service initialized successfully")
+	}
+	
+	// Initialize Flow service for Flow Builder
+	flowRepository, err := flowRepo.NewSQLiteRepository(config.PathStorages + "/flows.db")
+	if err != nil {
+		logrus.Warnf("failed to initialize flow repository: %v", err)
+	} else {
+		flowService = usecase.NewFlowService(flowRepository)
+		logrus.Info("Flow service initialized successfully")
 	}
 }
 

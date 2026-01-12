@@ -68,6 +68,9 @@
     <!-- Axios -->
     <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
     
+    <!-- Flow Builder Component -->
+    <script src="/components/FlowBuilder.js"></script>
+    
     <style>
         [v-cloak] { display: none; }
         
@@ -380,6 +383,42 @@
                             </div>
     </div>
 
+                        <!-- Flows Section -->
+                        <div v-if="!isCreating && selectedAgent" class="pt-6 border-t border-dark-border">
+                            <div class="flex items-center justify-between mb-4">
+                                <h3 class="text-lg font-semibold text-white">Automation Flows</h3>
+                                <button @click="createFlow" type="button"
+                                        class="flex items-center gap-2 px-3 py-1.5 bg-primary-600 hover:bg-primary-500 text-white text-sm font-medium rounded-lg transition-colors">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                                    </svg>
+                                    New Flow
+                                </button>
+                            </div>
+                            
+                            <div v-if="flows.length === 0" class="text-center py-8 bg-dark-bg rounded-xl">
+                                <p class="text-dark-muted mb-2">No flows yet</p>
+                                <p class="text-xs text-dark-muted">Create a flow to automate responses</p>
+                            </div>
+                            
+                            <div v-else class="space-y-2">
+                                <div v-for="flow in flows" :key="flow.id" 
+                                     class="flex items-center justify-between p-3 bg-dark-bg rounded-lg hover:bg-dark-border/50 transition-colors cursor-pointer"
+                                     @click="editFlow(flow)">
+                                    <div class="flex items-center gap-3">
+                                        <div :class="['w-2 h-2 rounded-full', flow.is_active ? 'bg-green-500' : 'bg-dark-muted']"></div>
+                                        <span class="text-white">{{ flow.name }}</span>
+                                        <span class="text-xs text-dark-muted">{{ flow.nodes?.length || 0 }} nodes</span>
+                                    </div>
+                                    <button @click.stop="deleteFlow(flow)" class="p-1 hover:bg-red-500/20 rounded text-dark-muted hover:text-red-400">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                        </svg>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
                         <!-- Actions -->
                         <div class="flex items-center gap-4 pt-6">
                             <button type="submit" :disabled="saving"
@@ -394,6 +433,14 @@
                     </form>
                 </div>
     </div>
+
+            <!-- Flow Builder -->
+            <flow-builder v-if="showFlowBuilder" 
+                          :agent-id="selectedAgent?.id"
+                          :flow-id="editingFlowId"
+                          @close="closeFlowBuilder"
+                          @save="onFlowSaved">
+            </flow-builder>
 
             <!-- WhatsApp QR Modal -->
             <div v-if="showQRModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
@@ -474,6 +521,11 @@
                 const qrLoading = ref(false);
                 const telegramToken = ref('');
                 
+                // Flows
+                const flows = ref([]);
+                const showFlowBuilder = ref(false);
+                const editingFlowId = ref(null);
+                
                 const form = reactive({
                     name: '',
                     description: '',
@@ -535,6 +587,8 @@
                             welcome_message: selectedAgent.value.welcome_message,
                             is_active: selectedAgent.value.is_active
                         });
+                        // Load flows for this agent
+                        await loadFlows(agent.id);
                     } catch (error) {
                         showToast('Failed to load agent details', 'error');
                     }
@@ -650,6 +704,51 @@
                     }
                 };
 
+                // Flow methods
+                const loadFlows = async (agentId) => {
+                    try {
+                        const response = await axios.get(`/api/flows?agent_id=${agentId}`);
+                        flows.value = response.data.results || [];
+                    } catch (error) {
+                        console.error('Failed to load flows:', error);
+                        flows.value = [];
+                    }
+                };
+
+                const createFlow = () => {
+                    editingFlowId.value = null;
+                    showFlowBuilder.value = true;
+                };
+
+                const editFlow = (flow) => {
+                    editingFlowId.value = flow.id;
+                    showFlowBuilder.value = true;
+                };
+
+                const closeFlowBuilder = () => {
+                    showFlowBuilder.value = false;
+                    editingFlowId.value = null;
+                    if (selectedAgent.value) {
+                        loadFlows(selectedAgent.value.id);
+                    }
+                };
+
+                const onFlowSaved = (flow) => {
+                    showToast('Flow saved successfully');
+                    closeFlowBuilder();
+                };
+
+                const deleteFlow = async (flow) => {
+                    if (!confirm(`Delete flow "${flow.name}"?`)) return;
+                    try {
+                        await axios.delete(`/api/flows/${flow.id}`);
+                        showToast('Flow deleted');
+                        await loadFlows(selectedAgent.value.id);
+                    } catch (error) {
+                        showToast('Failed to delete flow', 'error');
+                    }
+                };
+
                 onMounted(() => {
                     loadAgents();
                 });
@@ -667,6 +766,9 @@
                     qrCode,
                     qrLoading,
                     telegramToken,
+                    flows,
+                    showFlowBuilder,
+                    editingFlowId,
                     startCreating,
                     selectAgent,
                     goBack,
@@ -676,10 +778,17 @@
                     connectIntegration,
                     disconnectIntegration,
                     refreshQR,
-                    submitTelegramToken
+                    submitTelegramToken,
+                    createFlow,
+                    editFlow,
+                    closeFlowBuilder,
+                    onFlowSaved,
+                    deleteFlow
                 };
             }
-        }).mount('#app');
+        })
+        .component('flow-builder', FlowBuilder)
+        .mount('#app');
 </script>
 </body>
 </html>

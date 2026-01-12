@@ -11,7 +11,7 @@ var (
 	AppDebug               = false
 	AppOs                  = "AldinoKemal"
 	AppPlatform            = waCompanionReg.DeviceProps_PlatformType(1)
-	AppBasicAuthCredential []string
+	AppBasicAuthCredential = []string{"admin:password"} // Default login: admin, password: password
 	AppBasePath            = ""
 	AppTrustedProxies      []string // Trusted proxy IP ranges (e.g., "0.0.0.0/0" for all, or specific CIDRs)
 
