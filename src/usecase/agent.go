@@ -295,3 +295,25 @@ func (s *AgentService) UpdateIntegrationConfig(ctx context.Context, integrationI
 	return s.repo.UpdateIntegration(ctx, integration)
 }
 
+// Conversation methods for Live Chat
+
+// GetAllConversations returns all conversations
+func (s *AgentService) GetAllConversations(ctx context.Context) ([]*agent.Conversation, error) {
+	return s.repo.GetAllConversations(ctx)
+}
+
+// GetConversation returns a single conversation by ID
+func (s *AgentService) GetConversation(ctx context.Context, id string) (*agent.Conversation, error) {
+	return s.repo.GetConversationByID(ctx, id)
+}
+
+// GetMessagesForConversation returns all messages for a conversation
+func (s *AgentService) GetMessagesForConversation(ctx context.Context, conversationID string) ([]*agent.Message, error) {
+	return s.repo.GetMessagesForConversation(ctx, conversationID)
+}
+
+// GetLastMessage returns the last message for a conversation
+func (s *AgentService) GetLastMessage(ctx context.Context, conversationID string) (*agent.Message, error) {
+	return s.repo.GetLastMessageForConversation(ctx, conversationID)
+}
+

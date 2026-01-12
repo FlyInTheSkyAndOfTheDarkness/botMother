@@ -333,6 +333,81 @@ func (r *SQLiteRepository) GetRecentMessages(ctx context.Context, conversationID
 	return messages, rows.Err()
 }
 
+// GetAllConversations returns all conversations with optional filtering
+func (r *SQLiteRepository) GetAllConversations(ctx context.Context) ([]*agent.Conversation, error) {
+	rows, err := r.db.QueryContext(ctx,
+		`SELECT id, agent_id, integration_id, remote_jid, is_first_reply, created_at, updated_at
+		FROM conversations ORDER BY updated_at DESC`,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var conversations []*agent.Conversation
+	for rows.Next() {
+		c := &agent.Conversation{}
+		if err := rows.Scan(&c.ID, &c.AgentID, &c.IntegrationID, &c.RemoteJID, &c.IsFirstReply, &c.CreatedAt, &c.UpdatedAt); err != nil {
+			return nil, err
+		}
+		conversations = append(conversations, c)
+	}
+	return conversations, rows.Err()
+}
+
+// GetConversationByID returns a single conversation
+func (r *SQLiteRepository) GetConversationByID(ctx context.Context, id string) (*agent.Conversation, error) {
+	c := &agent.Conversation{}
+	err := r.db.QueryRowContext(ctx,
+		`SELECT id, agent_id, integration_id, remote_jid, is_first_reply, created_at, updated_at
+		FROM conversations WHERE id = ?`, id,
+	).Scan(&c.ID, &c.AgentID, &c.IntegrationID, &c.RemoteJID, &c.IsFirstReply, &c.CreatedAt, &c.UpdatedAt)
+	if err != nil {
+		return nil, err
+	}
+	return c, nil
+}
+
+// GetMessagesForConversation returns all messages for a conversation
+func (r *SQLiteRepository) GetMessagesForConversation(ctx context.Context, conversationID string) ([]*agent.Message, error) {
+	rows, err := r.db.QueryContext(ctx,
+		`SELECT id, conversation_id, role, content, timestamp
+		FROM messages WHERE conversation_id = ?
+		ORDER BY timestamp ASC`, conversationID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var messages []*agent.Message
+	for rows.Next() {
+		m := &agent.Message{}
+		if err := rows.Scan(&m.ID, &m.ConversationID, &m.Role, &m.Content, &m.Timestamp); err != nil {
+			return nil, err
+		}
+		messages = append(messages, m)
+	}
+	return messages, rows.Err()
+}
+
+// GetLastMessageForConversation returns the last message
+func (r *SQLiteRepository) GetLastMessageForConversation(ctx context.Context, conversationID string) (*agent.Message, error) {
+	m := &agent.Message{}
+	err := r.db.QueryRowContext(ctx,
+		`SELECT id, conversation_id, role, content, timestamp
+		FROM messages WHERE conversation_id = ?
+		ORDER BY timestamp DESC LIMIT 1`, conversationID,
+	).Scan(&m.ID, &m.ConversationID, &m.Role, &m.Content, &m.Timestamp)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
 // Helper to parse integration config
 func ParseWhatsAppConfig(configJSON string) (*agent.WhatsAppConfig, error) {
 	var config agent.WhatsAppConfig
