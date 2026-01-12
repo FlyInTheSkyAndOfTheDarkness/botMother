@@ -226,8 +226,8 @@ func (e *FlowExecutor) executeAIAgent(ctx context.Context, execCtx *ExecutionCon
 	// Interpolate variables in system prompt
 	systemPrompt = e.interpolateVariables(systemPrompt, execCtx.Variables)
 
-	// Call AI
-	ai := aiService.NewService(apiKey)
+	// Call AI (Flow executor doesn't use SerpAPI, so pass empty string)
+	ai := aiService.NewService(apiKey, "")
 	response, err := ai.GenerateResponse(ctx, userMessage, systemPrompt, model)
 	if err != nil {
 		return nil, fmt.Errorf("AI generation failed: %w", err)
