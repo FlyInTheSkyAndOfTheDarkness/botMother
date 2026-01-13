@@ -174,6 +174,18 @@ func (s *AgentService) HandleIncomingMessage(ctx context.Context, agentID, integ
 	}
 	logrus.Debugf("✅ [AgentService] Agent %s (%s) is active", agentID, a.Name)
 
+	// Check if integration is connected
+	integration, err := s.repo.GetIntegrationByID(ctx, integrationID)
+	if err != nil {
+		logrus.Errorf("❌ [AgentService] Integration %s not found: %v", integrationID, err)
+		return "", fmt.Errorf("integration not found: %w", err)
+	}
+	if !integration.IsConnected {
+		logrus.Warnf("⚠️  [AgentService] Integration %s (type: %s) is not connected", integrationID, integration.Type)
+		return "", fmt.Errorf("integration is not connected")
+	}
+	logrus.Debugf("✅ [AgentService] Integration %s (type: %s) is connected", integrationID, integration.Type)
+
 	// Get or create conversation
 	conv, err := s.repo.GetOrCreateConversation(ctx, agentID, integrationID, remoteJID)
 	if err != nil {

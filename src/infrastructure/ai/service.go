@@ -65,23 +65,27 @@ func (s *Service) GenerateResponse(ctx context.Context, userMessage string, syst
 	var searchResults string
 	if needsSearch {
 		if s.serpService == nil {
-			logrus.Debugf("SerpAPI service not available (no API key configured)")
+			logrus.Debugf("🌐 [AI Service] SerpAPI service not available (no API key configured)")
 		} else {
 			// Extract search query from user message
 			searchQuery := s.extractSearchQuery(userMessage)
 			if searchQuery != "" {
-				logrus.Infof("Searching internet for: %s", searchQuery)
+				logrus.Infof("🔍 [AI Service] Searching internet for: %s", searchQuery)
 				results, err := s.serpService.Search(searchQuery)
 				if err == nil {
 					searchResults = results
-					logrus.Infof("SerpAPI search successful, results length: %d", len(searchResults))
+					logrus.Infof("✅ [AI Service] SerpAPI search successful, results length: %d", len(searchResults))
 					// Add search results to user message
 					userMessage = fmt.Sprintf("User question: %s\n\nSearch results from internet:\n%s\n\nPlease answer based on the search results above.", userMessage, searchResults)
 				} else {
-					logrus.Warnf("SerpAPI search failed: %v", err)
+					logrus.Warnf("⚠️  [AI Service] SerpAPI search failed: %v", err)
 				}
+			} else {
+				logrus.Debugf("ℹ️  [AI Service] Could not extract search query from message")
 			}
 		}
+	} else {
+		logrus.Debugf("ℹ️  [AI Service] Message does not require internet search")
 	}
 
 	req := openai.ChatCompletionRequest{
