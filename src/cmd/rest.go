@@ -151,10 +151,10 @@ func restServer(_ *cobra.Command, _ []string) {
 	if healthService != nil {
 		rest.InitRestHealth(platformAPI, healthService)
 	}
-	
+
 	// Initialize Instagram routes
 	rest.InitRestInstagram(platformAPI)
-	
+
 	// Initialize Calendar routes
 	if calendarRepository != nil {
 		rest.InitRestCalendar(platformAPI, calendarRepository)
