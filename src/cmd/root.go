@@ -430,7 +430,7 @@ func initApp() {
 	if err != nil {
 		logrus.Warnf("failed to open agent database for analytics: %v", err)
 	} else {
-		analyticsRepository := analyticsRepo.NewSQLiteRepository(agentDB, chatStorageDB)
+		analyticsRepository := analyticsRepo.NewSQLiteRepository(agentDB)
 		analyticsService = usecase.NewAnalyticsService(analyticsRepository)
 		logrus.Info("Analytics service initialized successfully")
 	}
