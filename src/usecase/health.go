@@ -131,7 +131,7 @@ func (s *HealthService) checkTelegramHealth() health.TelegramHealth {
 			continue
 		}
 		for _, integration := range integrations {
-			if integration.Type == agent.IntegrationTypeTelegram {
+			if integration.Type == "telegram" {
 				health.TotalBots++
 				if integration.IsConnected && s.telegramChecker != nil && s.telegramChecker(integration.ID) {
 					health.RunningBots++
