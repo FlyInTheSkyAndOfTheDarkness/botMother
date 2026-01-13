@@ -212,7 +212,8 @@ func (h *AgentMessageHandler) HandleIncomingMessage(
 		}
 
 		if matchingIntegration == nil {
-			logrus.Debugf("⏭️  [WhatsApp Agent] No matching WhatsApp integration for agent %s", ag.ID)
+			logrus.Warnf("⚠️  [WhatsApp Agent] No matching WhatsApp integration found for agent %s (%s) with device %s. "+
+				"Make sure the integration has DeviceID or JID configured and matches the current device.", ag.ID, ag.Name, deviceJID)
 			continue
 		}
 
