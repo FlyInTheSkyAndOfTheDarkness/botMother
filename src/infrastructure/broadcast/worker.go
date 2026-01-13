@@ -8,7 +8,8 @@ import (
 
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/domains/agent"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/domains/settings"
-	agentRepo "github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/agent"
+	agentRepo 	"github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/agent"
+	instagramPkg "github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/instagram"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/telegram"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/whatsapp"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/pkg/utils"
@@ -161,6 +162,8 @@ func (w *BroadcastWorker) sendMessage(ctx context.Context, broadcast *settings.B
 		return w.sendWhatsAppMessage(ctx, broadcast, recipient)
 	case agent.IntegrationTypeTelegram:
 		return w.sendTelegramMessage(ctx, broadcast, recipient)
+	case agent.IntegrationTypeInstagram:
+		return w.sendInstagramMessage(ctx, broadcast, recipient)
 	default:
 		return fmt.Errorf("unsupported integration type: %s", broadcast.IntegrationType)
 	}
