@@ -374,6 +374,24 @@ func (s *AgentService) HandleIncomingMessage(ctx context.Context, agentID, integ
 		}
 		logrus.Infof("💡 [AgentService] AI response generated for agent %s: %s", a.ID, response[:min(100, len(response))])
 
+		// Translation: Translate outgoing response if enabled
+		if agentSettings != nil && agentSettings.Translation.Enabled && agentSettings.Translation.TranslateOutgoing {
+			sourceLang := agentSettings.Translation.SourceLanguage
+			// Detect user's language from original message
+			if agentSettings.Translation.AutoDetect {
+				userLang, err := aiSvc.DetectLanguage(ctx, userMessage) // Use original message
+				if err == nil && userLang != sourceLang {
+					translated, err := aiSvc.TranslateText(ctx, response, sourceLang, userLang)
+					if err == nil {
+						logrus.Infof("🔄 [AgentService] Translated outgoing response from %s to %s", sourceLang, userLang)
+						response = translated
+					} else {
+						logrus.Warnf("⚠️  [AgentService] Failed to translate outgoing response: %v", err)
+					}
+				}
+			}
+		}
+
 		// Mark conversation as having had first reply
 		if !conv.IsFirstReply {
 			conv.IsFirstReply = true
