@@ -406,6 +406,11 @@ func initApp() {
 		logrus.Warn("Agent routes will not be available")
 	} else {
 		agentService = usecase.NewAgentService(agentRepository)
+		// Set settings service if available
+		if settingsService != nil {
+			agentService.SetSettingsService(settingsService)
+			logrus.Info("Settings service linked to Agent service")
+		}
 		// Initialize WhatsApp message handler for agents
 		whatsapp.InitAgentHandler(agentRepository)
 		logrus.Info("Agent service initialized successfully")

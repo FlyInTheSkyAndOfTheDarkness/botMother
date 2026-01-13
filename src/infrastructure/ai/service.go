@@ -39,7 +39,7 @@ func NewService(apiToken string, serpAPIKey string) *Service {
 }
 
 // GenerateResponse generates an AI response for the given user message
-func (s *Service) GenerateResponse(ctx context.Context, userMessage string, systemPrompt string, model string) (string, error) {
+func (s *Service) GenerateResponse(ctx context.Context, userMessage string, systemPrompt string, model string, maxTokens int, temperature float64) (string, error) {
 	if s == nil || s.client == nil {
 		return "", fmt.Errorf("AI service not initialized")
 	}
@@ -88,6 +88,14 @@ func (s *Service) GenerateResponse(ctx context.Context, userMessage string, syst
 		logrus.Debugf("ℹ️  [AI Service] Message does not require internet search")
 	}
 
+	// Use provided values or defaults
+	if maxTokens <= 0 {
+		maxTokens = 500 // Default limit
+	}
+	if temperature < 0 || temperature > 1 {
+		temperature = 0.7 // Default temperature
+	}
+
 	req := openai.ChatCompletionRequest{
 		Model: model,
 		Messages: []openai.ChatCompletionMessage{
@@ -100,8 +108,8 @@ func (s *Service) GenerateResponse(ctx context.Context, userMessage string, syst
 				Content: userMessage,
 			},
 		},
-		MaxTokens: 500, // Limit response length for WhatsApp
-		Temperature: 0.7,
+		MaxTokens:   maxTokens,
+		Temperature: float32(temperature),
 	}
 
 	resp, err := s.client.CreateChatCompletion(ctx, req)

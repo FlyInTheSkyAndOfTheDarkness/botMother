@@ -96,7 +96,7 @@ func restServer(_ *cobra.Command, _ []string) {
 	if config.AppBasePath != "" {
 		apiGroup = app.Group(config.AppBasePath)
 	}
-	
+
 	// Create /api group for platform-level routes (no device required)
 	platformAPI := apiGroup.Group("/api")
 
@@ -113,7 +113,7 @@ func restServer(_ *cobra.Command, _ []string) {
 		rest.InitRestNewsletter(r, newsletterUsecase)
 		websocket.RegisterRoutes(r, appUsecase)
 	}
-	
+
 	// Initialize Agent routes (no device required - platform-level)
 	if agentService != nil {
 		rest.InitRestAgent(platformAPI, agentService, appUsecase)
@@ -121,32 +121,32 @@ func restServer(_ *cobra.Command, _ []string) {
 	} else {
 		logrus.Warn("Agent service is nil - agent routes will not be available")
 	}
-	
+
 	// Initialize Flow routes (no device required - platform-level)
 	if flowService != nil {
 		rest.InitRestFlow(platformAPI, flowService)
 	}
-	
+
 	// Initialize Analytics routes
 	if analyticsService != nil {
 		rest.InitRestAnalytics(platformAPI, analyticsService)
 	}
-	
+
 	// Initialize Conversation routes for Live Chat
 	if agentService != nil {
 		rest.InitRestConversation(platformAPI, agentService)
 	}
-	
+
 	// Initialize Knowledge routes for RAG
 	if knowledgeService != nil {
 		rest.InitRestKnowledge(platformAPI, knowledgeService)
 	}
-	
+
 	// Initialize Settings routes
 	if settingsService != nil {
 		rest.InitRestSettings(platformAPI, settingsService, broadcastWorker)
 	}
-	
+
 	// Initialize Calendar routes
 	if calendarRepository != nil {
 		rest.InitRestCalendar(platformAPI, calendarRepository)

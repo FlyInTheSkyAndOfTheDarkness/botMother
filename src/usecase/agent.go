@@ -12,11 +12,17 @@ import (
 )
 
 type AgentService struct {
-	repo *agentRepo.SQLiteRepository
+	repo            *agentRepo.SQLiteRepository
+	settingsService *SettingsService
 }
 
 func NewAgentService(repo *agentRepo.SQLiteRepository) *AgentService {
 	return &AgentService{repo: repo}
+}
+
+// SetSettingsService sets the settings service (called after initialization)
+func (s *AgentService) SetSettingsService(settingsService *SettingsService) {
+	s.settingsService = settingsService
 }
 
 func maskAPIKey(key string) string {
@@ -209,6 +215,32 @@ func (s *AgentService) HandleIncomingMessage(ctx context.Context, agentID, integ
 	
 	logrus.Debugf("🔄 [AgentService] Processing message for conv %s, agent active: %v, manual mode: %v", conv.ID, a.IsActive, conv.IsManualMode)
 
+	// Check Working Hours if settings service is available
+	if s.settingsService != nil {
+		isWorking, awayMessage, err := s.settingsService.IsWithinWorkingHours(ctx, agentID)
+		if err != nil {
+			logrus.Warnf("⚠️  [AgentService] Failed to check working hours: %v", err)
+		} else if !isWorking {
+			logrus.Infof("⏰ [AgentService] Agent %s is outside working hours, sending away message", agentID)
+			// Store user message
+			userMsg := &agent.Message{
+				ConversationID: conv.ID,
+				Role:           "user",
+				Content:        userMessage,
+			}
+			s.repo.AddMessage(ctx, userMsg)
+			
+			// Store away message as assistant response
+			awayMsg := &agent.Message{
+				ConversationID: conv.ID,
+				Role:           "assistant",
+				Content:        awayMessage,
+			}
+			s.repo.AddMessage(ctx, awayMsg)
+			return awayMessage, nil
+		}
+	}
+
 	// Store user message
 	userMsg := &agent.Message{
 		ConversationID: conv.ID,
@@ -220,6 +252,18 @@ func (s *AgentService) HandleIncomingMessage(ctx context.Context, agentID, integ
 	}
 
 	var response string
+
+	// Get agent settings for max_tokens and temperature
+	var maxTokens int = 500
+	var temperature float64 = 0.7
+	if s.settingsService != nil {
+		agentSettings, err := s.settingsService.GetAgentSettings(ctx, agentID)
+		if err == nil && agentSettings != nil {
+			maxTokens = agentSettings.MaxTokensPerMsg
+			temperature = agentSettings.Temperature
+			logrus.Debugf("⚙️  [AgentService] Using settings: max_tokens=%d, temperature=%.2f", maxTokens, temperature)
+		}
+	}
 
 	// Check if this is the first reply - send welcome message
 	if !conv.IsFirstReply && a.WelcomeMessage != "" {
@@ -267,7 +311,7 @@ func (s *AgentService) HandleIncomingMessage(ctx context.Context, agentID, integ
 		}
 
 		logrus.Debugf("💭 [AgentService] Generating AI response for agent %s (model: %s)", a.ID, a.Model)
-		response, err = aiSvc.GenerateResponse(ctx, finalPrompt, a.SystemPrompt, a.Model)
+		response, err = aiSvc.GenerateResponse(ctx, finalPrompt, a.SystemPrompt, a.Model, maxTokens, temperature)
 		if err != nil {
 			logrus.Errorf("❌ [AgentService] Failed to generate AI response for agent %s: %v", a.ID, err)
 			return "", fmt.Errorf("failed to generate AI response: %w", err)

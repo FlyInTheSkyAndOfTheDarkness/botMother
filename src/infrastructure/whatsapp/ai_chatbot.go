@@ -135,7 +135,7 @@ func handleAIChatbot(ctx context.Context, evt *events.Message, chatStorageRepo d
 	}
 
 	// Generate AI response
-	aiResponse, err := service.GenerateResponse(ctx, userMessage, config.AIChatbotSystemPrompt, config.AIChatbotModel)
+		aiResponse, err := service.GenerateResponse(ctx, userMessage, config.AIChatbotSystemPrompt, config.AIChatbotModel, 500, 0.7)
 	if err != nil {
 		log.Errorf("Failed to generate AI response: %v", err)
 		return

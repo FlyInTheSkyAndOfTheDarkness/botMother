@@ -378,7 +378,7 @@ func (h *AgentMessageHandler) processMessageForAgent(
 			finalPrompt = fmt.Sprintf("Previous conversation:\n%s\nCurrent message: %s", contextBuilder.String(), userMessage)
 		}
 
-	response, err = aiSvc.GenerateResponse(ctx, finalPrompt, ag.SystemPrompt, ag.Model)
+		response, err = aiSvc.GenerateResponse(ctx, finalPrompt, ag.SystemPrompt, ag.Model, 500, 0.7)
 	if err != nil {
 		logrus.Errorf("❌ [WhatsApp Agent] Failed to generate AI response for agent %s: %v", ag.ID, err)
 		return
