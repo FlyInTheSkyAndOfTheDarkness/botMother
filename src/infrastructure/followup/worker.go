@@ -2,7 +2,8 @@ package followup
 
 import (
 	"context"
-	"fmt"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/domains/agent"
@@ -19,7 +20,7 @@ import (
 
 // FollowUpWorker handles automatic follow-up messages
 type FollowUpWorker struct {
-	settingsService *settings.ISettingsService
+	settingsService settings.ISettingsService
 	agentRepo       *agentRepo.SQLiteRepository
 	checkInterval   time.Duration
 	stopChan        chan struct{}
@@ -27,7 +28,7 @@ type FollowUpWorker struct {
 
 // NewFollowUpWorker creates a new follow-up worker
 func NewFollowUpWorker(
-	settingsService *settings.ISettingsService,
+	settingsService settings.ISettingsService,
 	agentRepo *agentRepo.SQLiteRepository,
 ) *FollowUpWorker {
 	return &FollowUpWorker{
@@ -77,7 +78,7 @@ func (w *FollowUpWorker) processFollowUps(ctx context.Context) {
 		}
 
 		// Get agent settings
-		agentSettings, err := (*w.settingsService).GetAgentSettings(ctx, agent.ID)
+		agentSettings, err := w.settingsService.GetAgentSettings(ctx, agent.ID)
 		if err != nil {
 			logrus.Debugf("⚠️  Follow-up worker: Failed to get settings for agent %s: %v", agent.ID, err)
 			continue
@@ -272,11 +273,11 @@ func (w *FollowUpWorker) sendFollowUpMessage(ctx context.Context, agent *agent.A
 
 	// Send message based on integration type
 	switch integration.Type {
-	case agent.IntegrationTypeWhatsApp:
+	case "whatsapp":
 		w.sendWhatsAppFollowUp(ctx, integration, conv, followUpMessage)
-	case agent.IntegrationTypeTelegram:
+	case "telegram":
 		w.sendTelegramFollowUp(ctx, integration, conv, followUpMessage)
-	case agent.IntegrationTypeInstagram:
+	case "instagram":
 		w.sendInstagramFollowUp(ctx, integration, conv, followUpMessage)
 	default:
 		logrus.Warnf("⚠️  Follow-up worker: Unsupported integration type: %s", integration.Type)

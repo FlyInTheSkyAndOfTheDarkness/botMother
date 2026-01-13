@@ -29,6 +29,7 @@ import (
 	domainNewsletter "github.com/aldinokemal/go-whatsapp-web-multidevice/domains/newsletter"
 	domainSend "github.com/aldinokemal/go-whatsapp-web-multidevice/domains/send"
 	domainUser "github.com/aldinokemal/go-whatsapp-web-multidevice/domains/user"
+	"github.com/aldinokemal/go-whatsapp-web-multidevice/domains/settings"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/chatstorage"
 	instagramPkg "github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/instagram"
 	telegramBot "github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/telegram"
@@ -479,7 +480,8 @@ func initApp() {
 			logrus.Info("Broadcast worker initialized successfully")
 			
 			// Initialize Follow-up worker
-			followUpWorker = followupPkg.NewFollowUpWorker(settingsService, agentRepository)
+			var settingsSvc settings.ISettingsService = settingsService
+			followUpWorker = followupPkg.NewFollowUpWorker(settingsSvc, agentRepository)
 			go followUpWorker.Start(context.Background())
 			logrus.Info("Follow-up worker initialized and started")
 		}
