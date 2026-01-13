@@ -72,15 +72,15 @@ func (w *FollowUpWorker) processFollowUps(ctx context.Context) {
 		return
 	}
 
-	for _, agent := range agents {
-		if !agent.IsActive {
+	for _, ag := range agents {
+		if !ag.IsActive {
 			continue
 		}
 
 		// Get agent settings
-		agentSettings, err := w.settingsService.GetAgentSettings(ctx, agent.ID)
+		agentSettings, err := w.settingsService.GetAgentSettings(ctx, ag.ID)
 		if err != nil {
-			logrus.Debugf("⚠️  Follow-up worker: Failed to get settings for agent %s: %v", agent.ID, err)
+			logrus.Debugf("⚠️  Follow-up worker: Failed to get settings for agent %s: %v", ag.ID, err)
 			continue
 		}
 
@@ -90,7 +90,7 @@ func (w *FollowUpWorker) processFollowUps(ctx context.Context) {
 		}
 
 		// Process follow-ups for this agent
-		w.processAgentFollowUps(ctx, agent, agentSettings)
+		w.processAgentFollowUps(ctx, ag, agentSettings)
 	}
 }
 
