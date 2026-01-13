@@ -474,6 +474,12 @@ func initApp() {
 	// Initialize Health service for system monitoring
 	if agentRepository != nil {
 		healthService = usecase.NewHealthService(agentRepository)
+		// Set Telegram checker to avoid import cycle
+		if botMgr := telegramBot.GetBotManager(); botMgr != nil {
+			healthService.SetTelegramChecker(func(integrationID string) bool {
+				return botMgr.IsBotRunning(integrationID)
+			})
+		}
 		logrus.Info("Health service initialized successfully")
 	}
 	

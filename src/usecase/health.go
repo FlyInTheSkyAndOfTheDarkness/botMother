@@ -7,17 +7,22 @@ import (
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/domains/agent"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/domains/health"
 	agentRepo "github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/agent"
-	telegramBot "github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/telegram"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/whatsapp"
 	"github.com/sirupsen/logrus"
 )
 
 type HealthService struct {
-	agentRepo *agentRepo.SQLiteRepository
+	agentRepo        *agentRepo.SQLiteRepository
+	telegramChecker  func(integrationID string) bool // Function to check if Telegram bot is running
 }
 
 func NewHealthService(agentRepo *agentRepo.SQLiteRepository) *HealthService {
 	return &HealthService{agentRepo: agentRepo}
+}
+
+// SetTelegramChecker sets the function to check Telegram bot status (to avoid import cycle)
+func (s *HealthService) SetTelegramChecker(checker func(integrationID string) bool) {
+	s.telegramChecker = checker
 }
 
 // GetSystemHealth returns overall system health status
@@ -110,18 +115,28 @@ func (s *HealthService) checkWhatsAppHealth() health.WhatsAppHealth {
 func (s *HealthService) checkTelegramHealth() health.TelegramHealth {
 	health := health.TelegramHealth{}
 
-	botManager := telegramBot.GetBotManager()
-	if botManager == nil {
+	// Count Telegram integrations from agents
+	ctx := context.Background()
+	agents, err := s.agentRepo.GetAll(ctx)
+	if err != nil {
 		return health
 	}
 
-	// Get all bots from manager
-	bots := botManager.ListBots()
-	health.TotalBots = len(bots)
-
-	for _, bot := range bots {
-		if bot != nil && bot.IsRunning() {
-			health.RunningBots++
+	for _, agent := range agents {
+		if !agent.IsActive {
+			continue
+		}
+		integrations, err := s.agentRepo.GetIntegrationsByAgentID(ctx, agent.ID)
+		if err != nil {
+			continue
+		}
+		for _, integration := range integrations {
+			if integration.Type == agent.IntegrationTypeTelegram {
+				health.TotalBots++
+				if integration.IsConnected && s.telegramChecker != nil && s.telegramChecker(integration.ID) {
+					health.RunningBots++
+				}
+			}
 		}
 	}
 
@@ -257,22 +272,8 @@ func (s *HealthService) checkTelegramIntegration(ctx context.Context, integratio
 	}
 
 	// Get bot manager
-	botManager := telegramBot.GetBotManager()
-	if botManager == nil {
-		status.Status = "error"
-		status.Message = "Bot manager not initialized"
-		return status
-	}
-
-	// Check if bot is running
-	botManager := telegramBot.GetBotManager()
-	if botManager == nil {
-		status.Status = "error"
-		status.Message = "Bot manager not initialized"
-		return status
-	}
-
-	if botManager.IsBotRunning(integration.ID) {
+	// Check if bot is running using checker function (to avoid import cycle)
+	if s.telegramChecker != nil && s.telegramChecker(integration.ID) {
 		status.Status = "connected"
 		status.Message = "Bot is running"
 	} else if integration.IsConnected {

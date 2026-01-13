@@ -52,7 +52,7 @@ type TelegramBot struct {
 	agentService  *usecase.AgentService
 	stopChan      chan struct{}
 	running       bool
-	mu            sync.Mutex
+	mu            sync.RWMutex
 }
 
 // BotManager manages multiple Telegram bots
