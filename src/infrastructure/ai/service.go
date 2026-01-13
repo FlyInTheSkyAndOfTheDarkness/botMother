@@ -3,12 +3,9 @@ package ai
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
 	"os"
 	"strings"
-
-	"encoding/json"
 
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/config"
 	serp "github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/serp"
