@@ -171,6 +171,13 @@ func (b *TelegramBot) Start() {
 	b.running = true
 	b.mu.Unlock()
 
+	// Ensure running is set to false when we exit (whether normally or due to error)
+	defer func() {
+		b.mu.Lock()
+		b.running = false
+		b.mu.Unlock()
+	}()
+
 	tokenPreview := b.Token
 	if len(tokenPreview) > 15 {
 		tokenPreview = tokenPreview[:15] + "..."
@@ -233,7 +240,13 @@ func (b *TelegramBot) Stop() {
 	defer b.mu.Unlock()
 
 	if b.running {
-		close(b.stopChan)
+		// Only close if channel is not already closed
+		select {
+		case <-b.stopChan:
+			// Channel already closed, do nothing
+		default:
+			close(b.stopChan)
+		}
 		b.running = false
 	}
 }
