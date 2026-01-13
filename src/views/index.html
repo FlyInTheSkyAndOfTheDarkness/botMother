@@ -251,16 +251,20 @@
                             <span class="px-2.5 py-1 bg-dark-bg rounded-lg text-xs font-mono text-dark-muted">[[ agent.api_key_masked ]]</span>
     </div>
 
-                        <!-- Integration Icons -->
+                        <!-- Integration Icons with Health Status -->
                         <div class="flex items-center gap-2 pt-4 border-t border-dark-border">
                             <span class="text-xs text-dark-muted mr-2">Integrations:</span>
                             <div v-for="integration in agent.integrations" :key="integration.id" 
-                                 class="flex items-center gap-1.5 px-2 py-1 rounded-lg"
+                                 class="flex items-center gap-1.5 px-2 py-1 rounded-lg relative group"
                                  :class="integration.is_connected ? 'bg-green-500/10 text-green-400' : 'bg-dark-bg text-dark-muted'">
                                 <span v-if="integration.type === 'whatsapp'" class="text-sm">📱</span>
                                 <span v-else-if="integration.type === 'telegram'" class="text-sm">✈️</span>
                                 <span v-else-if="integration.type === 'instagram'" class="text-sm">📷</span>
                                 <span class="text-xs capitalize">[[ integration.type ]]</span>
+                                <!-- Health indicator dot -->
+                                <span v-if="integration.is_connected" 
+                                      class="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-green-400 animate-pulse"
+                                      title="Connected"></span>
                             </div>
                             <span v-if="!agent.integrations || agent.integrations.length === 0" class="text-xs text-dark-muted">None</span>
                         </div>

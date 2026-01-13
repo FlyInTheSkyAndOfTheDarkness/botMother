@@ -8,13 +8,31 @@ const Dashboard = {
                 <h2 class="text-2xl font-bold text-white">Dashboard</h2>
                 <p class="text-dark-muted">Overview of your AI agents performance</p>
             </div>
-            <select v-model="period" @change="loadData" 
-                    class="px-4 py-2 bg-dark-card border border-dark-border rounded-lg text-white text-sm focus:border-primary-500 focus:outline-none">
-                <option value="today">Today</option>
-                <option value="7days">Last 7 days</option>
-                <option value="30days">Last 30 days</option>
-                <option value="month">This month</option>
-            </select>
+            <div class="flex items-center gap-4">
+                <!-- Health status pill -->
+                <div v-if="health"
+                     :class="['flex items-center gap-2 px-3 py-1 rounded-full text-xs font-medium',
+                              health.status === 'healthy' ? 'bg-green-500/10 text-green-400' :
+                              health.status === 'degraded' ? 'bg-yellow-500/10 text-yellow-400' :
+                              'bg-red-500/10 text-red-400']">
+                    <span class="inline-flex h-2 w-2 rounded-full"
+                          :class="health.status === 'healthy' ? 'bg-green-400' :
+                                  health.status === 'degraded' ? 'bg-yellow-400' : 'bg-red-400'"></span>
+                    <span class="capitalize">{{ health.status }}</span>
+                    <span class="text-dark-muted">
+                        • WA {{ health.whatsapp.connected_devices || 0 }}/{{ health.whatsapp.total_devices || 0 }},
+                        TG {{ health.telegram.running_bots || 0 }}/{{ health.telegram.total_bots || 0 }},
+                        Agents {{ health.active_agents || 0 }}/{{ health.total_agents || 0 }}
+                    </span>
+                </div>
+                <select v-model="period" @change="loadData" 
+                        class="px-4 py-2 bg-dark-card border border-dark-border rounded-lg text-white text-sm focus:border-primary-500 focus:outline-none">
+                    <option value="today">Today</option>
+                    <option value="7days">Last 7 days</option>
+                    <option value="30days">Last 30 days</option>
+                    <option value="month">This month</option>
+                </select>
+            </div>
         </div>
 
         <!-- Stats Cards -->
@@ -168,13 +186,14 @@ const Dashboard = {
     `,
 
     setup() {
-        const { ref, onMounted } = Vue;
+        const { ref, onMounted, onBeforeUnmount } = Vue;
 
         const period = ref('7days');
         const stats = ref({});
         const chartData = ref([]);
         const activity = ref([]);
         const agentStats = ref([]);
+        const health = ref(null);
 
         const loadData = async () => {
             try {
@@ -193,6 +212,14 @@ const Dashboard = {
                 // Load agent stats
                 const agentRes = await axios.get(`/api/analytics/agents?period=${period.value}`);
                 agentStats.value = agentRes.data.results || [];
+
+                // Load system health
+                try {
+                    const healthRes = await axios.get('/api/health');
+                    health.value = healthRes.data.results || null;
+                } catch (err) {
+                    console.warn('Failed to load health status:', err);
+                }
             } catch (error) {
                 console.error('Failed to load analytics:', error);
             }
@@ -228,12 +255,32 @@ const Dashboard = {
             return Math.round((agent.messages_sent / agent.messages_received) * 100);
         };
 
+        // Auto-refresh health status every 30 seconds
+        let healthInterval = null;
+
         onMounted(() => {
             loadData();
+            // Set up auto-refresh for health status
+            healthInterval = setInterval(async () => {
+                try {
+                    const healthRes = await axios.get('/api/health');
+                    health.value = healthRes.data.results || null;
+                } catch (err) {
+                    console.warn('Failed to refresh health status:', err);
+                }
+            }, 30000); // Refresh every 30 seconds
+        });
+
+        // Cleanup interval on unmount
+        onBeforeUnmount(() => {
+            if (healthInterval) {
+                clearInterval(healthInterval);
+                healthInterval = null;
+            }
         });
 
         return {
-            period, stats, chartData, activity, agentStats,
+            period, stats, chartData, activity, agentStats, health,
             loadData, getBarHeight, formatChartLabel, formatTime, getResponseRate
         };
     }

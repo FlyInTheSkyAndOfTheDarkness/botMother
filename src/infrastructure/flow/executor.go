@@ -228,7 +228,12 @@ func (e *FlowExecutor) executeAIAgent(ctx context.Context, execCtx *ExecutionCon
 
 	// Call AI (Flow executor doesn't use SerpAPI, so pass empty string)
 	ai := aiService.NewService(apiKey, "")
-	response, err := ai.GenerateResponse(ctx, userMessage, systemPrompt, model)
+
+	// Use sensible defaults for flows; they are independent from per-agent settings
+	const defaultMaxTokens = 500
+	const defaultTemperature = 0.7
+
+	response, err := ai.GenerateResponse(ctx, userMessage, systemPrompt, model, defaultMaxTokens, defaultTemperature)
 	if err != nil {
 		return nil, fmt.Errorf("AI generation failed: %w", err)
 	}
