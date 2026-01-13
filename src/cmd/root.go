@@ -17,7 +17,7 @@ import (
 	analyticsRepo "github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/analytics"
 	knowledgeRepo "github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/knowledge"
 	settingsRepo "github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/settings"
-	broadcastWorker "github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/broadcast"
+	broadcastPkg "github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/broadcast"
 	calendarRepo "github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/calendar"
 	domainApp "github.com/aldinokemal/go-whatsapp-web-multidevice/domains/app"
 	domainChat "github.com/aldinokemal/go-whatsapp-web-multidevice/domains/chat"
@@ -81,7 +81,7 @@ var (
 	settingsService *usecase.SettingsService
 	
 	// Broadcast worker for sending broadcast messages
-	broadcastWorker *broadcastWorker.BroadcastWorker
+	broadcastWorker *broadcastPkg.BroadcastWorker
 	
 	// Calendar repository
 	calendarRepository *calendarRepo.SQLiteRepository
@@ -458,7 +458,7 @@ func initApp() {
 		
 		// Initialize Broadcast worker if agent repository is available
 		if agentRepository != nil {
-			broadcastWorker = broadcastWorker.NewBroadcastWorker(settingsService, agentRepository)
+			broadcastWorker = broadcastPkg.NewBroadcastWorker(settingsService, agentRepository)
 			logrus.Info("Broadcast worker initialized successfully")
 		}
 	}
