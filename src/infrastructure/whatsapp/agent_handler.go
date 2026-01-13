@@ -83,10 +83,12 @@ func (h *AgentMessageHandler) HandleIncomingMessage(
 		return
 	}
 
-	// Get current device phone number to find matching integration
+	// Get current device JID to find matching integration
 	deviceJID := ""
+	deviceJIDNonAD := ""
 	if client.Store.ID != nil {
 		deviceJID = client.Store.ID.String()
+		deviceJIDNonAD = client.Store.ID.ToNonAD().String()
 	}
 
 	// Find agents with active WhatsApp integrations matching this device
@@ -129,23 +131,83 @@ func (h *AgentMessageHandler) HandleIncomingMessage(
 				continue
 			}
 
-			logrus.Infof("🔍 [WhatsApp Agent] Checking WhatsApp integration %s (connected: %v)", integration.ID, integration.IsConnected)
+				logrus.Infof("🔍 [WhatsApp Agent] Checking WhatsApp integration %s (connected: %v)", integration.ID, integration.IsConnected)
 			
-			// For now, use first connected WhatsApp integration
-			// TODO: Match by device JID stored in config
-			waConfig, _ := agentRepo.ParseWhatsAppConfig(integration.Config)
-			if waConfig != nil {
-				logrus.Debugf("📱 [WhatsApp Agent] Integration config: device_id=%s, current_device=%s", waConfig.DeviceID, deviceJID)
-				if waConfig.DeviceID == deviceJID {
-					matchingIntegration = integration
-					logrus.Infof("✅ [WhatsApp Agent] Found matching integration %s for device %s", integration.ID, deviceJID)
-					break
+			// Parse WhatsApp config
+			waConfig, err := agentRepo.ParseWhatsAppConfig(integration.Config)
+			if err != nil {
+				logrus.Warnf("⚠️  [WhatsApp Agent] Failed to parse WhatsApp config for integration %s: %v", integration.ID, err)
+				continue
+			}
+			
+			if waConfig == nil {
+				logrus.Debugf("📱 [WhatsApp Agent] Integration %s has no config", integration.ID)
+				// If no config, skip this integration (safety)
+				continue
+			}
+			
+			// Try to match by DeviceID first
+			matched := false
+			if waConfig.DeviceID != "" {
+				// Match by DeviceID (exact match)
+				if waConfig.DeviceID == deviceJID || waConfig.DeviceID == deviceJIDNonAD {
+					matched = true
+					logrus.Infof("✅ [WhatsApp Agent] Matched integration %s by DeviceID: %s", integration.ID, waConfig.DeviceID)
+				} else {
+					logrus.Debugf("📱 [WhatsApp Agent] DeviceID mismatch: config=%s, current=%s/%s", waConfig.DeviceID, deviceJID, deviceJIDNonAD)
 				}
 			}
-			// If no specific device configured, use any connected integration
-			if matchingIntegration == nil {
+			
+			// If DeviceID didn't match, try JID
+			if !matched && waConfig.JID != "" {
+				// Match by JID (exact match)
+				if waConfig.JID == deviceJID || waConfig.JID == deviceJIDNonAD {
+					matched = true
+					logrus.Infof("✅ [WhatsApp Agent] Matched integration %s by JID: %s", integration.ID, waConfig.JID)
+				} else {
+					logrus.Debugf("📱 [WhatsApp Agent] JID mismatch: config=%s, current=%s/%s", waConfig.JID, deviceJID, deviceJIDNonAD)
+				}
+			}
+			
+			// If still no match, try to find device by DeviceID/JID in DeviceManager
+			if !matched && (waConfig.DeviceID != "" || waConfig.JID != "") {
+				deviceManager := GetDeviceManager()
+				if deviceManager != nil {
+					// Try to find device by DeviceID
+					if waConfig.DeviceID != "" {
+						if deviceInst, ok := deviceManager.GetDevice(waConfig.DeviceID); ok && deviceInst != nil {
+							deviceInstJID := deviceInst.JID()
+							if deviceInstJID == deviceJID || deviceInstJID == deviceJIDNonAD {
+								matched = true
+								logrus.Infof("✅ [WhatsApp Agent] Matched integration %s via DeviceManager by DeviceID: %s (JID: %s)", integration.ID, waConfig.DeviceID, deviceInstJID)
+							}
+						}
+					}
+					
+					// Try to find device by JID
+					if !matched && waConfig.JID != "" {
+						// Search all devices for matching JID
+						for _, deviceInst := range deviceManager.ListDevices() {
+							if deviceInst.JID() == waConfig.JID && (deviceInst.JID() == deviceJID || deviceInst.JID() == deviceJIDNonAD) {
+								matched = true
+								logrus.Infof("✅ [WhatsApp Agent] Matched integration %s via DeviceManager by JID: %s", integration.ID, waConfig.JID)
+								break
+							}
+						}
+					}
+				}
+			}
+			
+			// If no DeviceID or JID configured, skip this integration (safety - don't use random integration)
+			if !matched && waConfig.DeviceID == "" && waConfig.JID == "" {
+				logrus.Warnf("⚠️  [WhatsApp Agent] Integration %s has no DeviceID or JID configured - skipping for safety", integration.ID)
+				continue
+			}
+			
+			if matched {
 				matchingIntegration = integration
-				logrus.Infof("✅ [WhatsApp Agent] Using first connected integration %s (no device match required)", integration.ID)
+				logrus.Infof("✅ [WhatsApp Agent] Found matching integration %s for device %s", integration.ID, deviceJID)
+				break
 			}
 		}
 

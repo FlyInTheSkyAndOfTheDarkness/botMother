@@ -41,7 +41,8 @@ type Integration struct {
 // WhatsAppConfig holds WhatsApp-specific integration settings
 type WhatsAppConfig struct {
 	PhoneNumber string `json:"phone_number,omitempty"`
-	DeviceID    string `json:"device_id,omitempty"`
+	DeviceID    string `json:"device_id,omitempty"`    // Device ID (can be custom or JID)
+	JID         string `json:"jid,omitempty"`           // WhatsApp JID (phone@s.whatsapp.net)
 	// Session data stored separately for security
 }
 

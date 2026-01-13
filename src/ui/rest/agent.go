@@ -12,6 +12,7 @@ import (
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/pkg/utils"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/usecase"
 	"github.com/gofiber/fiber/v2"
+	"github.com/sirupsen/logrus"
 )
 
 type AgentHandler struct {
@@ -286,14 +287,45 @@ func (h *AgentHandler) ConnectIntegration(c *fiber.Ctx) error {
 		}
 
 	case agent.IntegrationTypeWhatsApp:
-		// WhatsApp connection - save device_id
+		// WhatsApp connection - save device_id and JID
 		deviceID, _ := configBody["device_id"].(string)
-		config := agent.WhatsAppConfig{DeviceID: deviceID}
+		if deviceID == "" {
+			return fiber.NewError(fiber.StatusBadRequest, "device_id is required for WhatsApp")
+		}
+		
+		// Get device instance to retrieve JID
+		deviceManager := whatsapp.GetDeviceManager()
+		if deviceManager == nil {
+			return fiber.NewError(fiber.StatusInternalServerError, "Device manager not initialized")
+		}
+		
+		deviceInstance, ok := deviceManager.GetDevice(deviceID)
+		if !ok || deviceInstance == nil {
+			return fiber.NewError(fiber.StatusNotFound, fmt.Sprintf("Device %s not found", deviceID))
+		}
+		
+		// Get JID from device instance
+		deviceJID := deviceInstance.JID()
+		if deviceJID == "" {
+			// If JID is not available yet, try to update state
+			deviceInstance.UpdateStateFromClient()
+			deviceJID = deviceInstance.JID()
+		}
+		
+		// Save both DeviceID and JID for better matching
+		config := agent.WhatsAppConfig{
+			DeviceID: deviceID,
+			JID:      deviceJID,
+		}
 		configJSON, _ := json.Marshal(config)
+		
+		logrus.Infof("💾 [Agent] Saving WhatsApp integration config: device_id=%s, jid=%s", deviceID, deviceJID)
 		
 		if err := h.Service.UpdateIntegrationConfig(c.UserContext(), integrationID, string(configJSON), true); err != nil {
 			return fiber.NewError(fiber.StatusInternalServerError, err.Error())
 		}
+		
+		logrus.Infof("✅ [Agent] WhatsApp integration %s connected with device %s (JID: %s)", integrationID, deviceID, deviceJID)
 
 	case agent.IntegrationTypeInstagram:
 		accessToken, _ := configBody["access_token"].(string)
