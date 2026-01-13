@@ -18,6 +18,7 @@ import (
 	knowledgeRepo "github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/knowledge"
 	settingsRepo "github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/settings"
 	broadcastPkg "github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/broadcast"
+	followupPkg "github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/followup"
 	calendarRepo "github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/calendar"
 	domainApp "github.com/aldinokemal/go-whatsapp-web-multidevice/domains/app"
 	domainChat "github.com/aldinokemal/go-whatsapp-web-multidevice/domains/chat"
@@ -83,6 +84,9 @@ var (
 	
 	// Broadcast worker for sending broadcast messages
 	broadcastWorker *broadcastPkg.BroadcastWorker
+	
+	// Follow-up worker for automatic follow-up messages
+	followUpWorker *followupPkg.FollowUpWorker
 	
 	// Health service for system monitoring
 	healthService *usecase.HealthService
@@ -473,6 +477,11 @@ func initApp() {
 		if agentRepository != nil {
 			broadcastWorker = broadcastPkg.NewBroadcastWorker(settingsService, agentRepository)
 			logrus.Info("Broadcast worker initialized successfully")
+			
+			// Initialize Follow-up worker
+			followUpWorker = followupPkg.NewFollowUpWorker(settingsService, agentRepository)
+			go followUpWorker.Start(context.Background())
+			logrus.Info("Follow-up worker initialized and started")
 		}
 	}
 	
