@@ -128,6 +128,39 @@ func (m *BotManager) StopBot(integrationID string) {
 	}
 }
 
+// GetBot returns a bot by integration ID
+func (m *BotManager) GetBot(integrationID string) *TelegramBot {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.bots[integrationID]
+}
+
+// ListBots returns all running bots
+func (m *BotManager) ListBots() map[string]*TelegramBot {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	result := make(map[string]*TelegramBot)
+	for k, v := range m.bots {
+		result[k] = v
+	}
+	return result
+}
+
+// IsBotRunning checks if a bot is running
+func (m *BotManager) IsBotRunning(integrationID string) bool {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	bot, exists := m.bots[integrationID]
+	return exists && bot != nil && bot.IsRunning()
+}
+
+// IsRunning returns whether the bot is currently running
+func (b *TelegramBot) IsRunning() bool {
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+	return b.running
+}
+
 // Start begins polling for updates
 func (b *TelegramBot) Start() {
 	b.mu.Lock()

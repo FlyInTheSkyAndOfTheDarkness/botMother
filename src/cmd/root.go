@@ -83,6 +83,9 @@ var (
 	// Broadcast worker for sending broadcast messages
 	broadcastWorker *broadcastPkg.BroadcastWorker
 	
+	// Health service for system monitoring
+	healthService *usecase.HealthService
+	
 	// Calendar repository
 	calendarRepository *calendarRepo.SQLiteRepository
 )
@@ -466,6 +469,12 @@ func initApp() {
 			broadcastWorker = broadcastPkg.NewBroadcastWorker(settingsService, agentRepository)
 			logrus.Info("Broadcast worker initialized successfully")
 		}
+	}
+	
+	// Initialize Health service for system monitoring
+	if agentRepository != nil {
+		healthService = usecase.NewHealthService(agentRepository)
+		logrus.Info("Health service initialized successfully")
 	}
 	
 	// Initialize Calendar repository

@@ -146,7 +146,12 @@ func restServer(_ *cobra.Command, _ []string) {
 	if settingsService != nil {
 		rest.InitRestSettings(platformAPI, settingsService, broadcastWorker)
 	}
-
+	
+	// Initialize Health routes
+	if healthService != nil {
+		rest.InitRestHealth(platformAPI, healthService)
+	}
+	
 	// Initialize Calendar routes
 	if calendarRepository != nil {
 		rest.InitRestCalendar(platformAPI, calendarRepository)
