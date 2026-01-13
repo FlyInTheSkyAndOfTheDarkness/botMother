@@ -2,17 +2,19 @@ package rest
 
 import (
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/domains/settings"
+	broadcastWorker "github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/broadcast"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/pkg/utils"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/usecase"
 	"github.com/gofiber/fiber/v2"
 )
 
 type SettingsHandler struct {
-	Service *usecase.SettingsService
+	Service      *usecase.SettingsService
+	BroadcastWorker *broadcastWorker.BroadcastWorker
 }
 
-func InitRestSettings(app fiber.Router, service *usecase.SettingsService) SettingsHandler {
-	handler := SettingsHandler{Service: service}
+func InitRestSettings(app fiber.Router, service *usecase.SettingsService, worker *broadcastWorker.BroadcastWorker) SettingsHandler {
+	handler := SettingsHandler{Service: service, BroadcastWorker: worker}
 
 	app.Get("/agents/:agentId/settings", handler.GetAgentSettings)
 	app.Put("/agents/:agentId/settings", handler.UpdateAgentSettings)
@@ -144,12 +146,14 @@ func (h *SettingsHandler) SendBroadcast(c *fiber.Ctx) error {
 		return fiber.NewError(fiber.StatusInternalServerError, err.Error())
 	}
 
-	// TODO: Actually send messages in background
-	// For now just mark as completed
-	go func() {
-		// Simulate sending
-		h.Service.UpdateBroadcastStatus(c.UserContext(), id, "completed", len(broadcast.Recipients), 0)
-	}()
+	// Send messages in background using worker
+	if h.BroadcastWorker == nil {
+		return fiber.NewError(fiber.StatusInternalServerError, "Broadcast worker not initialized")
+	}
+	
+	if err := h.BroadcastWorker.ExecuteBroadcast(c.UserContext(), id); err != nil {
+		return fiber.NewError(fiber.StatusInternalServerError, "Failed to start broadcast: "+err.Error())
+	}
 
 	return c.JSON(utils.ResponseData{
 		Status:  200,
