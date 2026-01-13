@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/domains/agent"
+	"github.com/aldinokemal/go-whatsapp-web-multidevice/domains/settings"
 	agentRepo "github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/agent"
 	aiService "github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/ai"
 	"github.com/sirupsen/logrus"
@@ -241,29 +242,89 @@ func (s *AgentService) HandleIncomingMessage(ctx context.Context, agentID, integ
 		}
 	}
 
-	// Store user message
-	userMsg := &agent.Message{
-		ConversationID: conv.ID,
-		Role:           "user",
-		Content:        userMessage,
-	}
-	if err := s.repo.AddMessage(ctx, userMsg); err != nil {
-		return "", fmt.Errorf("failed to store user message: %w", err)
-	}
-
-	var response string
-
-	// Get agent settings for max_tokens and temperature
+	// Get agent settings for max_tokens, temperature, translation, and sentiment
 	var maxTokens int = 500
 	var temperature float64 = 0.7
+	var agentSettings *settings.AgentSettings
 	if s.settingsService != nil {
-		agentSettings, err := s.settingsService.GetAgentSettings(ctx, agentID)
+		var err error
+		agentSettings, err = s.settingsService.GetAgentSettings(ctx, agentID)
 		if err == nil && agentSettings != nil {
 			maxTokens = agentSettings.MaxTokensPerMsg
 			temperature = agentSettings.Temperature
 			logrus.Debugf("⚙️  [AgentService] Using settings: max_tokens=%d, temperature=%.2f", maxTokens, temperature)
 		}
 	}
+
+	// Process user message: Translation and Sentiment Analysis
+	processedUserMessage := userMessage
+	
+	// Initialize AI service for translation and sentiment
+	aiSvc := aiService.NewService(a.APIKey, a.SerpAPIKey)
+	if aiSvc == nil {
+		logrus.Errorf("❌ [AgentService] Failed to initialize AI service for agent %s", a.ID)
+		return "", fmt.Errorf("failed to initialize AI service")
+	}
+
+	// Sentiment Analysis (if enabled)
+	if agentSettings != nil && agentSettings.Sentiment.Enabled {
+		sentimentScore, sentimentLabel, err := aiSvc.AnalyzeSentiment(ctx, userMessage)
+		if err == nil {
+			logrus.Infof("😊 [AgentService] Sentiment analysis: score=%.2f, label=%s", sentimentScore, sentimentLabel)
+			
+			// Check if negative sentiment threshold is exceeded
+			if agentSettings.Sentiment.AlertOnNegative && sentimentScore < -agentSettings.Sentiment.NegativeThreshold {
+				logrus.Warnf("⚠️  [AgentService] Negative sentiment detected (score: %.2f, threshold: %.2f)", sentimentScore, agentSettings.Sentiment.NegativeThreshold)
+				// TODO: Send alert/notification
+			}
+			
+			// Check if very negative (escalate to human)
+			if agentSettings.Sentiment.EscalateOnVeryNegative && sentimentScore < -0.7 {
+				logrus.Warnf("🚨 [AgentService] Very negative sentiment detected (score: %.2f), consider escalating to human", sentimentScore)
+				// TODO: Auto-escalate to manual mode
+			}
+		} else {
+			logrus.Warnf("⚠️  [AgentService] Failed to analyze sentiment: %v", err)
+		}
+	}
+
+	// Translation: Translate incoming message if enabled
+	if agentSettings != nil && agentSettings.Translation.Enabled && agentSettings.Translation.TranslateIncoming {
+		sourceLang := agentSettings.Translation.SourceLanguage
+		if agentSettings.Translation.AutoDetect {
+			detectedLang, err := aiSvc.DetectLanguage(ctx, userMessage)
+			if err == nil {
+				logrus.Infof("🌐 [AgentService] Detected language: %s", detectedLang)
+				if detectedLang != sourceLang {
+					translated, err := aiSvc.TranslateText(ctx, userMessage, detectedLang, sourceLang)
+					if err == nil {
+						logrus.Infof("🔄 [AgentService] Translated incoming message from %s to %s", detectedLang, sourceLang)
+						processedUserMessage = translated
+					} else {
+						logrus.Warnf("⚠️  [AgentService] Failed to translate incoming message: %v", err)
+					}
+				}
+			} else {
+				logrus.Warnf("⚠️  [AgentService] Failed to detect language: %v", err)
+			}
+		} else {
+			// Assume user message is in a different language and translate to source language
+			// For now, we'll skip this if auto-detect is disabled (requires knowing user's language)
+			logrus.Debugf("ℹ️  [AgentService] Translation enabled but auto-detect disabled, skipping translation")
+		}
+	}
+
+	// Store user message (original or translated)
+	userMsg := &agent.Message{
+		ConversationID: conv.ID,
+		Role:           "user",
+		Content:        processedUserMessage, // Store processed message
+	}
+	if err := s.repo.AddMessage(ctx, userMsg); err != nil {
+		return "", fmt.Errorf("failed to store user message: %w", err)
+	}
+
+	var response string
 
 	// Check if this is the first reply - send welcome message
 	if !conv.IsFirstReply && a.WelcomeMessage != "" {
@@ -273,13 +334,8 @@ func (s *AgentService) HandleIncomingMessage(ctx context.Context, agentID, integ
 			return "", fmt.Errorf("failed to update conversation: %w", err)
 		}
 	} else {
-		// Generate AI response
-		aiSvc := aiService.NewService(a.APIKey, a.SerpAPIKey)
-		if aiSvc == nil {
-			logrus.Errorf("❌ [AgentService] Failed to initialize AI service for agent %s (API key present: %v)", a.ID, a.APIKey != "")
-			return "", fmt.Errorf("failed to initialize AI service")
-		}
-		logrus.Debugf("✅ [AgentService] AI service initialized for agent %s", a.ID)
+		// AI service already initialized above for translation/sentiment
+		logrus.Debugf("✅ [AgentService] Using AI service for agent %s", a.ID)
 		
 		// Log SerpAPI availability
 		if a.SerpAPIKey != "" {
