@@ -29,6 +29,7 @@ import (
 	domainSend "github.com/aldinokemal/go-whatsapp-web-multidevice/domains/send"
 	domainUser "github.com/aldinokemal/go-whatsapp-web-multidevice/domains/user"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/chatstorage"
+	instagramPkg "github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/instagram"
 	telegramBot "github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/telegram"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/whatsapp"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/pkg/utils"
@@ -425,6 +426,10 @@ func initApp() {
 		} else {
 			logrus.Info("Telegram bot manager initialized")
 		}
+		
+		// Initialize Instagram message handler
+		instagramPkg.InitInstagramHandler(agentRepository, agentService)
+		logrus.Info("Instagram handler initialized")
 	}
 	
 	// Initialize Flow service for Flow Builder

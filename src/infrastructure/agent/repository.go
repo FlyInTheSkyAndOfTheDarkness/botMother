@@ -457,3 +457,11 @@ func ParseTelegramConfig(configJSON string) (*agent.TelegramConfig, error) {
 	return &config, nil
 }
 
+func ParseInstagramConfig(configJSON string) (*agent.InstagramConfig, error) {
+	var config agent.InstagramConfig
+	if err := json.Unmarshal([]byte(configJSON), &config); err != nil {
+		return nil, err
+	}
+	return &config, nil
+}
+

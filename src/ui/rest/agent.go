@@ -344,8 +344,10 @@ func (h *AgentHandler) ConnectIntegration(c *fiber.Ctx) error {
 		if err := h.Service.UpdateIntegrationConfig(c.UserContext(), integrationID, string(configJSON), true); err != nil {
 			return fiber.NewError(fiber.StatusInternalServerError, err.Error())
 		}
+		
+		logrus.Infof("✅ [Agent] Instagram integration %s connected with page %s", integrationID, pageID)
 		// Note: Instagram messaging requires webhook setup for receiving messages
-		// For now, we just save the credentials
+		// Webhook endpoint: POST /api/instagram/webhook
 	}
 
 	return c.JSON(utils.ResponseData{
