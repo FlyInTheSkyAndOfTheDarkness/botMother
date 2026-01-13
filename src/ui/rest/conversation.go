@@ -8,10 +8,15 @@ import (
 	"strings"
 
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/domains/agent"
+	agentRepo "github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/agent"
 	telegramBot "github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/telegram"
+	"github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/whatsapp"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/pkg/utils"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/usecase"
 	"github.com/gofiber/fiber/v2"
+	"github.com/sirupsen/logrus"
+	"go.mau.fi/whatsmeow/proto/waE2E"
+	"google.golang.org/protobuf/proto"
 )
 
 type ConversationHandler struct {
@@ -225,9 +230,56 @@ func (h *ConversationHandler) SendMessage(c *fiber.Ctx) error {
 		}
 		
 	case agent.IntegrationTypeWhatsApp:
-		// TODO: Implement WhatsApp sending
-		// For now just log - WhatsApp requires device client
-		return fiber.NewError(fiber.StatusNotImplemented, "WhatsApp manual messaging not yet implemented")
+		// Parse WhatsApp config to get device ID
+		waConfig, err := agentRepo.ParseWhatsAppConfig(integration.Config)
+		if err != nil {
+			logrus.Errorf("❌ [Live Chat] Failed to parse WhatsApp config: %v", err)
+			return fiber.NewError(fiber.StatusInternalServerError, "Failed to parse WhatsApp integration config")
+		}
+
+		if waConfig == nil || waConfig.DeviceID == "" {
+			logrus.Warnf("⚠️  [Live Chat] WhatsApp integration %s has no device ID configured", integration.ID)
+			return fiber.NewError(fiber.StatusBadRequest, "WhatsApp integration is not properly configured (missing device ID)")
+		}
+
+		// Get device manager
+		deviceManager := whatsapp.GetDeviceManager()
+		if deviceManager == nil {
+			logrus.Error("❌ [Live Chat] Device manager not initialized")
+			return fiber.NewError(fiber.StatusInternalServerError, "WhatsApp device manager not available")
+		}
+
+		// Get device instance
+		deviceInstance, ok := deviceManager.GetDevice(waConfig.DeviceID)
+		if !ok || deviceInstance == nil {
+			logrus.Errorf("❌ [Live Chat] Device %s not found for WhatsApp integration %s", waConfig.DeviceID, integration.ID)
+			return fiber.NewError(fiber.StatusNotFound, fmt.Sprintf("WhatsApp device %s not found", waConfig.DeviceID))
+		}
+
+		// Get WhatsApp client from device
+		client := deviceInstance.GetClient()
+		if client == nil {
+			logrus.Errorf("❌ [Live Chat] WhatsApp client not available for device %s", waConfig.DeviceID)
+			return fiber.NewError(fiber.StatusServiceUnavailable, "WhatsApp client not connected")
+		}
+
+		// Format recipient JID (remoteJID is already in correct format from conversation)
+		recipientJID := utils.FormatJID(conv.RemoteJID)
+		logrus.Infof("📤 [Live Chat] Sending WhatsApp message to %s via device %s", recipientJID, waConfig.DeviceID)
+
+		// Send message using the same pattern as agent_handler.go
+		sendResp, err := client.SendMessage(
+			c.UserContext(),
+			recipientJID,
+			&waE2E.Message{Conversation: proto.String(req.Content)},
+		)
+
+		if err != nil {
+			logrus.Errorf("❌ [Live Chat] Failed to send WhatsApp message to %s: %v", recipientJID, err)
+			return fiber.NewError(fiber.StatusInternalServerError, "Failed to send WhatsApp message: "+err.Error())
+		}
+
+		logrus.Infof("✅ [Live Chat] WhatsApp message sent successfully (message ID: %s)", sendResp.ID)
 	}
 
 	// Add message to conversation after successful send
