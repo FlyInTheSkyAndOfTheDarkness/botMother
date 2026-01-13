@@ -150,3 +150,4 @@ type IAnalyticsService interface {
 	GetRecentActivity(ctx context.Context, limit int) ([]RecentActivity, error)
 }
 
+

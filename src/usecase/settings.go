@@ -119,3 +119,4 @@ func (s *SettingsService) UpdateBroadcastStatus(ctx context.Context, id string, 
 	return s.repo.UpdateBroadcast(ctx, broadcast)
 }
 
+

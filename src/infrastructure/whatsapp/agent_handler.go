@@ -92,47 +92,76 @@ func (h *AgentMessageHandler) HandleIncomingMessage(
 	// Find agents with active WhatsApp integrations matching this device
 	agents, err := h.agentRepo.GetAll(ctx)
 	if err != nil {
-		logrus.Errorf("Failed to get agents: %v", err)
+		logrus.Errorf("❌ [WhatsApp Agent] Failed to get agents: %v", err)
 		return
 	}
 
 	remoteJID := evt.Info.Sender.String()
+	logrus.Infof("📱 [WhatsApp Agent] Processing message from %s (device: %s), found %d agents", remoteJID, deviceJID, len(agents))
 
+	foundAgent := false
 	for _, ag := range agents {
 		if !ag.IsActive {
+			logrus.Debugf("⏭️  [WhatsApp Agent] Skipping agent %s (%s) - not active", ag.ID, ag.Name)
 			continue
 		}
+
+		logrus.Infof("✅ [WhatsApp Agent] Checking agent %s (%s) - is active", ag.ID, ag.Name)
 
 		// Get integrations for this agent
 		integrations, err := h.agentRepo.GetIntegrationsByAgentID(ctx, ag.ID)
 		if err != nil {
+			logrus.Warnf("⚠️  [WhatsApp Agent] Failed to get integrations for agent %s: %v", ag.ID, err)
 			continue
 		}
+
+		logrus.Debugf("📋 [WhatsApp Agent] Agent %s has %d integrations", ag.ID, len(integrations))
 
 		// Find WhatsApp integration that matches this device
 		var matchingIntegration *agent.Integration
 		for _, integration := range integrations {
-			if integration.Type == agent.IntegrationTypeWhatsApp && integration.IsConnected {
-				// For now, use first connected WhatsApp integration
-				// TODO: Match by device JID stored in config
-				waConfig, _ := agentRepo.ParseWhatsAppConfig(integration.Config)
-				if waConfig != nil && waConfig.DeviceID == deviceJID {
+			if integration.Type != agent.IntegrationTypeWhatsApp {
+				continue
+			}
+			
+			if !integration.IsConnected {
+				logrus.Debugf("⏭️  [WhatsApp Agent] Integration %s not connected", integration.ID)
+				continue
+			}
+
+			logrus.Infof("🔍 [WhatsApp Agent] Checking WhatsApp integration %s (connected: %v)", integration.ID, integration.IsConnected)
+			
+			// For now, use first connected WhatsApp integration
+			// TODO: Match by device JID stored in config
+			waConfig, _ := agentRepo.ParseWhatsAppConfig(integration.Config)
+			if waConfig != nil {
+				logrus.Debugf("📱 [WhatsApp Agent] Integration config: device_id=%s, current_device=%s", waConfig.DeviceID, deviceJID)
+				if waConfig.DeviceID == deviceJID {
 					matchingIntegration = integration
+					logrus.Infof("✅ [WhatsApp Agent] Found matching integration %s for device %s", integration.ID, deviceJID)
 					break
 				}
-				// If no specific device configured, use any connected integration
-				if matchingIntegration == nil {
-					matchingIntegration = integration
-				}
+			}
+			// If no specific device configured, use any connected integration
+			if matchingIntegration == nil {
+				matchingIntegration = integration
+				logrus.Infof("✅ [WhatsApp Agent] Using first connected integration %s (no device match required)", integration.ID)
 			}
 		}
 
 		if matchingIntegration == nil {
+			logrus.Debugf("⏭️  [WhatsApp Agent] No matching WhatsApp integration for agent %s", ag.ID)
 			continue
 		}
 
+		foundAgent = true
+		logrus.Infof("🚀 [WhatsApp Agent] Processing message for agent %s (%s) with integration %s", ag.ID, ag.Name, matchingIntegration.ID)
 		// Process message for this agent
 		go h.processMessageForAgent(ctx, ag, matchingIntegration, remoteJID, userMessage, chatStorageRepo, client)
+	}
+
+	if !foundAgent {
+		logrus.Warnf("⚠️  [WhatsApp Agent] No active agent with connected WhatsApp integration found for message from %s", remoteJID)
 	}
 }
 
@@ -201,12 +230,15 @@ func (h *AgentMessageHandler) processMessageForAgent(
 	chatStorageRepo domainChatStorage.IChatStorageRepository,
 	client *whatsmeow.Client,
 ) {
+	logrus.Infof("🤖 [WhatsApp Agent] Processing message for agent %s (%s): %s", ag.ID, ag.Name, userMessage[:min(50, len(userMessage))])
+	
 	// Create AI service with agent's API key
 	aiSvc := aiService.NewService(ag.APIKey, ag.SerpAPIKey)
 	if aiSvc == nil {
-		logrus.Errorf("Failed to create AI service for agent %s", ag.ID)
+		logrus.Errorf("❌ [WhatsApp Agent] Failed to create AI service for agent %s (API key: %v)", ag.ID, ag.APIKey != "")
 		return
 	}
+	logrus.Debugf("✅ [WhatsApp Agent] AI service created for agent %s", ag.ID)
 
 	// Handle audio transcription if needed
 	if strings.HasPrefix(userMessage, "[AUDIO:") && strings.HasSuffix(userMessage, "]") {
@@ -223,9 +255,10 @@ func (h *AgentMessageHandler) processMessageForAgent(
 	// Get or create conversation
 	conv, err := h.agentRepo.GetOrCreateConversation(ctx, ag.ID, integration.ID, remoteJID)
 	if err != nil {
-		logrus.Errorf("Failed to get conversation for agent %s: %v", ag.ID, err)
+		logrus.Errorf("❌ [WhatsApp Agent] Failed to get conversation for agent %s: %v", ag.ID, err)
 		return
 	}
+	logrus.Debugf("💬 [WhatsApp Agent] Conversation %s found/created for agent %s", conv.ID, ag.ID)
 
 	// Check if in manual mode (manager took over)
 	if conv.IsManualMode {
@@ -236,7 +269,7 @@ func (h *AgentMessageHandler) processMessageForAgent(
 			Content:        userMessage,
 		}
 		h.agentRepo.AddMessage(ctx, userMsg)
-		logrus.Debugf("Conversation %s is in manual mode, skipping AI response", conv.ID)
+		logrus.Infof("⏸️  [WhatsApp Agent] Conversation %s is in manual mode, skipping AI response", conv.ID)
 		return
 	}
 
@@ -282,23 +315,25 @@ func (h *AgentMessageHandler) processMessageForAgent(
 			finalPrompt = fmt.Sprintf("Previous conversation:\n%s\nCurrent message: %s", contextBuilder.String(), userMessage)
 		}
 
-		response, err = aiSvc.GenerateResponse(ctx, finalPrompt, ag.SystemPrompt, ag.Model)
-		if err != nil {
-			logrus.Errorf("Failed to generate AI response for agent %s: %v", ag.ID, err)
-			return
-		}
-
-		// Mark conversation as having had first reply
-		if !conv.IsFirstReply {
-			conv.IsFirstReply = true
-			h.agentRepo.UpdateConversation(ctx, conv)
-		}
-	}
-
-	if response == "" {
-		logrus.Warnf("Agent %s: AI returned empty response", ag.ID)
+	response, err = aiSvc.GenerateResponse(ctx, finalPrompt, ag.SystemPrompt, ag.Model)
+	if err != nil {
+		logrus.Errorf("❌ [WhatsApp Agent] Failed to generate AI response for agent %s: %v", ag.ID, err)
 		return
 	}
+
+	// Mark conversation as having had first reply
+	if !conv.IsFirstReply {
+		conv.IsFirstReply = true
+		h.agentRepo.UpdateConversation(ctx, conv)
+	}
+}
+
+if response == "" {
+	logrus.Warnf("⚠️  [WhatsApp Agent] Agent %s: AI returned empty response", ag.ID)
+	return
+}
+
+logrus.Infof("💡 [WhatsApp Agent] AI response generated for agent %s: %s", ag.ID, response[:min(100, len(response))])
 
 	// Store assistant response
 	assistantMsg := &agent.Message{
@@ -312,6 +347,7 @@ func (h *AgentMessageHandler) processMessageForAgent(
 
 	// Send the response via WhatsApp
 	recipientJID := utils.FormatJID(remoteJID)
+	logrus.Infof("📤 [WhatsApp Agent] Sending response to %s via agent %s", recipientJID, ag.ID)
 	sendResp, err := client.SendMessage(
 		ctx,
 		recipientJID,
@@ -319,9 +355,10 @@ func (h *AgentMessageHandler) processMessageForAgent(
 	)
 
 	if err != nil {
-		logrus.Errorf("Failed to send agent %s response: %v", ag.ID, err)
+		logrus.Errorf("❌ [WhatsApp Agent] Failed to send agent %s response to %s: %v", ag.ID, recipientJID, err)
 		return
 	}
+	logrus.Infof("✅ [WhatsApp Agent] Response sent successfully (message ID: %s)", sendResp.ID)
 
 	// Store sent message in chat storage
 	if chatStorageRepo != nil {
@@ -342,6 +379,13 @@ func (h *AgentMessageHandler) processMessageForAgent(
 		}
 	}
 
-	logrus.Infof("Agent %s sent response to %s", ag.Name, remoteJID)
+	logrus.Infof("✅ [WhatsApp Agent] Agent %s successfully processed and sent response to %s", ag.Name, remoteJID)
+}
+
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }
 

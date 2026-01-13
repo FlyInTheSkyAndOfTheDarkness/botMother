@@ -128,3 +128,4 @@ func (h *AnalyticsHandler) GetRecentActivity(c *fiber.Ctx) error {
 	})
 }
 
+

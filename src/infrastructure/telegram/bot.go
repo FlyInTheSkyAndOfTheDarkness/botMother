@@ -267,36 +267,37 @@ func (b *TelegramBot) handleUpdate(update TelegramUpdate) {
 	userMessage := msg.Text
 	userID := fmt.Sprintf("tg_%d", msg.From.ID)
 
-	logrus.Infof("Telegram message from %s (chat %d): %s", userID, chatID, userMessage)
+	logrus.Infof("📱 [Telegram] Message from %s (chat %d): %s", userID, chatID, userMessage)
 
 	// Check if agent service is available
 	if agentSvc == nil {
-		logrus.Error("Agent service is nil, cannot process message")
+		logrus.Error("❌ [Telegram] Agent service is nil, cannot process message")
 		return
 	}
 
 	// Get AI response from agent service
 	ctx := context.Background()
-	logrus.Infof("Calling HandleIncomingMessage for agent %s, integration %s, user %s", agentID, integrationID, userID)
+	logrus.Infof("🤖 [Telegram] Calling HandleIncomingMessage for agent %s, integration %s, user %s", agentID, integrationID, userID)
 	response, err := agentSvc.HandleIncomingMessage(ctx, agentID, integrationID, userID, userMessage)
 	if err != nil {
 		// Just log the error, don't send anything to user
-		logrus.Errorf("Failed to get AI response for agent %s: %v", agentID, err)
+		logrus.Errorf("❌ [Telegram] Failed to get AI response for agent %s: %v", agentID, err)
 		return
 	}
 
 	if response == "" {
-		logrus.Warnf("AI returned empty response for agent %s (manual mode or error)", agentID)
+		logrus.Warnf("⚠️  [Telegram] AI returned empty response for agent %s (manual mode or error)", agentID)
 		return
 	}
 	
-	logrus.Infof("AI response generated for agent %s: %s", agentID, response[:min(50, len(response))])
+	logrus.Infof("💡 [Telegram] AI response generated for agent %s: %s", agentID, response[:min(50, len(response))])
 
 	// Send response using captured token
+	logrus.Infof("📤 [Telegram] Sending response to chat %d", chatID)
 	if err := sendTelegramMessage(token, chatID, response); err != nil {
-		logrus.Errorf("Failed to send Telegram message: %v", err)
+		logrus.Errorf("❌ [Telegram] Failed to send message to chat %d: %v", chatID, err)
 	} else {
-		logrus.Infof("Sent response to chat %d", chatID)
+		logrus.Infof("✅ [Telegram] Response sent successfully to chat %d", chatID)
 	}
 }
 
@@ -366,5 +367,12 @@ func (m *BotManager) LoadBotsFromDB(ctx context.Context, agentRepo agent.IAgentR
 	}
 
 	return nil
+}
+
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }
 

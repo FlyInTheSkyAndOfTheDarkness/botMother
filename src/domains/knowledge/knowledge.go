@@ -79,3 +79,4 @@ type IKnowledgeService interface {
 	GetRelevantContext(ctx context.Context, agentID string, query string) (string, error)
 }
 
+

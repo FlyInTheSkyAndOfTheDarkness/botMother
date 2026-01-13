@@ -8,6 +8,7 @@ import (
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/domains/agent"
 	agentRepo "github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/agent"
 	aiService "github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/ai"
+	"github.com/sirupsen/logrus"
 )
 
 type AgentService struct {
@@ -158,21 +159,28 @@ func (s *AgentService) agentToResponse(ctx context.Context, a *agent.Agent) (*ag
 
 // HandleIncomingMessage processes an incoming message and generates AI response
 func (s *AgentService) HandleIncomingMessage(ctx context.Context, agentID, integrationID, remoteJID, userMessage string) (string, error) {
+	logrus.Infof("🤖 [AgentService] HandleIncomingMessage: agent=%s, integration=%s, user=%s, message=%s", agentID, integrationID, remoteJID, userMessage[:min(50, len(userMessage))])
+	
 	// Get agent
 	a, err := s.repo.GetByID(ctx, agentID)
 	if err != nil {
+		logrus.Errorf("❌ [AgentService] Agent not found: %s, error: %v", agentID, err)
 		return "", fmt.Errorf("agent not found: %w", err)
 	}
 
 	if !a.IsActive {
+		logrus.Warnf("⚠️  [AgentService] Agent %s (%s) is not active", agentID, a.Name)
 		return "", fmt.Errorf("agent is not active")
 	}
+	logrus.Debugf("✅ [AgentService] Agent %s (%s) is active", agentID, a.Name)
 
 	// Get or create conversation
 	conv, err := s.repo.GetOrCreateConversation(ctx, agentID, integrationID, remoteJID)
 	if err != nil {
+		logrus.Errorf("❌ [AgentService] Failed to get conversation: %v", err)
 		return "", fmt.Errorf("failed to get conversation: %w", err)
 	}
+	logrus.Debugf("💬 [AgentService] Conversation %s found/created", conv.ID)
 
 	// Check if in manual mode (manager took over)
 	if conv.IsManualMode {
@@ -183,12 +191,11 @@ func (s *AgentService) HandleIncomingMessage(ctx context.Context, agentID, integ
 			Content:        userMessage,
 		}
 		s.repo.AddMessage(ctx, userMsg)
-		// Log for debugging
-		fmt.Printf("[AgentService] Conversation %s is in manual mode, skipping AI response\n", conv.ID)
+		logrus.Infof("⏸️  [AgentService] Conversation %s is in manual mode, skipping AI response", conv.ID)
 		return "", nil // Return empty - no AI response in manual mode
 	}
 	
-	fmt.Printf("[AgentService] Processing message for conv %s, agent active: %v, manual mode: %v\n", conv.ID, a.IsActive, conv.IsManualMode)
+	logrus.Debugf("🔄 [AgentService] Processing message for conv %s, agent active: %v, manual mode: %v", conv.ID, a.IsActive, conv.IsManualMode)
 
 	// Store user message
 	userMsg := &agent.Message{
@@ -213,14 +220,16 @@ func (s *AgentService) HandleIncomingMessage(ctx context.Context, agentID, integ
 		// Generate AI response
 		aiSvc := aiService.NewService(a.APIKey, a.SerpAPIKey)
 		if aiSvc == nil {
+			logrus.Errorf("❌ [AgentService] Failed to initialize AI service for agent %s (API key present: %v)", a.ID, a.APIKey != "")
 			return "", fmt.Errorf("failed to initialize AI service")
 		}
+		logrus.Debugf("✅ [AgentService] AI service initialized for agent %s", a.ID)
 		
 		// Log SerpAPI availability
 		if a.SerpAPIKey != "" {
-			fmt.Printf("[AgentService] SerpAPI key configured for agent %s (length: %d)\n", a.ID, len(a.SerpAPIKey))
+			logrus.Debugf("🌐 [AgentService] SerpAPI key configured for agent %s (length: %d)", a.ID, len(a.SerpAPIKey))
 		} else {
-			fmt.Printf("[AgentService] No SerpAPI key for agent %s\n", a.ID)
+			logrus.Debugf("ℹ️  [AgentService] No SerpAPI key for agent %s", a.ID)
 		}
 
 		// Get recent messages for context (limited to 5 for efficiency)
@@ -245,10 +254,13 @@ func (s *AgentService) HandleIncomingMessage(ctx context.Context, agentID, integ
 			finalPrompt = fmt.Sprintf("Previous conversation:\n%s\nCurrent message: %s", contextBuilder.String(), userMessage)
 		}
 
+		logrus.Debugf("💭 [AgentService] Generating AI response for agent %s (model: %s)", a.ID, a.Model)
 		response, err = aiSvc.GenerateResponse(ctx, finalPrompt, a.SystemPrompt, a.Model)
 		if err != nil {
+			logrus.Errorf("❌ [AgentService] Failed to generate AI response for agent %s: %v", a.ID, err)
 			return "", fmt.Errorf("failed to generate AI response: %w", err)
 		}
+		logrus.Infof("💡 [AgentService] AI response generated for agent %s: %s", a.ID, response[:min(100, len(response))])
 
 		// Mark conversation as having had first reply
 		if !conv.IsFirstReply {
@@ -384,5 +396,12 @@ func (s *AgentService) GetConversationDetails(ctx context.Context, conversationI
 	}
 	
 	return conv, integration, nil
+}
+
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }
 
