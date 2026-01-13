@@ -284,13 +284,13 @@ func (w *FollowUpWorker) sendFollowUpMessage(ctx context.Context, agent *agent.A
 	}
 
 	// Store follow-up message in conversation
-	followUpMsg := agent.Message{
+	followUpMsg := &agent.Message{
 		ConversationID: conv.ID,
 		Role:           "assistant",
 		Content:        followUpMessage,
 		Timestamp:      time.Now(),
 	}
-	if err := w.agentRepo.AddMessage(ctx, &followUpMsg); err != nil {
+	if err := w.agentRepo.AddMessage(ctx, followUpMsg); err != nil {
 		logrus.Warnf("⚠️  Follow-up worker: Failed to store follow-up message: %v", err)
 	}
 
