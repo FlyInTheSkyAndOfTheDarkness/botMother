@@ -281,3 +281,39 @@ func (w *BroadcastWorker) sendTelegramMessage(ctx context.Context, broadcast *se
 	return nil
 }
 
+// sendInstagramMessage sends a message via Instagram
+func (w *BroadcastWorker) sendInstagramMessage(ctx context.Context, broadcast *settings.BroadcastMessage, recipient string) error {
+	// Get agent integrations
+	integrations, err := w.agentRepo.GetIntegrationsByAgentID(ctx, broadcast.AgentID)
+	if err != nil {
+		return fmt.Errorf("failed to get integrations: %w", err)
+	}
+
+	// Find Instagram integration
+	var igIntegration *agent.Integration
+	for _, integration := range integrations {
+		if integration.Type == agent.IntegrationTypeInstagram && integration.IsConnected {
+			igIntegration = integration
+			break
+		}
+	}
+
+	if igIntegration == nil {
+		return fmt.Errorf("no connected Instagram integration found for agent %s", broadcast.AgentID)
+	}
+
+	// Parse Instagram config
+	igConfig, err := agentRepo.ParseInstagramConfig(igIntegration.Config)
+	if err != nil || igConfig == nil || igConfig.AccessToken == "" || igConfig.PageID == "" {
+		return fmt.Errorf("invalid Instagram integration config for agent %s", broadcast.AgentID)
+	}
+
+	// Send message via Instagram API
+	if err := instagramPkg.SendInstagramMessage(igConfig.AccessToken, igConfig.PageID, recipient, broadcast.Message); err != nil {
+		return fmt.Errorf("failed to send Instagram message: %w", err)
+	}
+
+	logrus.Debugf("✅ [Broadcast] Instagram message sent to %s", recipient)
+	return nil
+}
+
