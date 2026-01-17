@@ -7,10 +7,10 @@ import (
 
 // WorkingHours represents agent's working hours configuration
 type WorkingHours struct {
-	Enabled     bool           `json:"enabled"`
-	Timezone    string         `json:"timezone"` // e.g., "Europe/Moscow"
-	Schedule    []DaySchedule  `json:"schedule"`
-	AwayMessage string         `json:"away_message"` // Message when outside working hours
+	Enabled     bool          `json:"enabled"`
+	Timezone    string        `json:"timezone"` // e.g., "Europe/Moscow"
+	Schedule    []DaySchedule `json:"schedule"`
+	AwayMessage string        `json:"away_message"` // Message when outside working hours
 }
 
 // DaySchedule represents working hours for a specific day
@@ -32,19 +32,19 @@ type TranslationSettings struct {
 
 // FollowUpSettings represents follow-up automation
 type FollowUpSettings struct {
-	Enabled         bool     `json:"enabled"`
-	DelayMinutes    int      `json:"delay_minutes"`    // Time after last message
-	MaxFollowUps    int      `json:"max_follow_ups"`   // Max follow-ups per conversation
-	Messages        []string `json:"messages"`         // Follow-up message templates
-	OnlyIfNoReply   bool     `json:"only_if_no_reply"` // Only send if user hasn't replied
+	Enabled       bool     `json:"enabled"`
+	DelayMinutes  int      `json:"delay_minutes"`    // Time after last message
+	MaxFollowUps  int      `json:"max_follow_ups"`   // Max follow-ups per conversation
+	Messages      []string `json:"messages"`         // Follow-up message templates
+	OnlyIfNoReply bool     `json:"only_if_no_reply"` // Only send if user hasn't replied
 }
 
 // SentimentSettings represents sentiment analysis configuration
 type SentimentSettings struct {
-	Enabled           bool    `json:"enabled"`
-	AlertOnNegative   bool    `json:"alert_on_negative"`   // Send alert for negative sentiment
-	NegativeThreshold float64 `json:"negative_threshold"`  // Threshold for negative (0-1)
-	EscalateOnVeryNegative bool `json:"escalate_on_very_negative"` // Auto-escalate to human
+	Enabled                bool    `json:"enabled"`
+	AlertOnNegative        bool    `json:"alert_on_negative"`         // Send alert for negative sentiment
+	NegativeThreshold      float64 `json:"negative_threshold"`        // Threshold for negative (0-1)
+	EscalateOnVeryNegative bool    `json:"escalate_on_very_negative"` // Auto-escalate to human
 }
 
 // AgentSettings represents all configurable settings for an agent
@@ -63,20 +63,20 @@ type AgentSettings struct {
 
 // BroadcastMessage represents a broadcast/bulk message
 type BroadcastMessage struct {
-	ID             string     `json:"id"`
-	AgentID        string     `json:"agent_id"`
-	IntegrationType string    `json:"integration_type"` // whatsapp, telegram, etc.
-	Message        string     `json:"message"`
-	MediaURL       string     `json:"media_url,omitempty"`
-	Recipients     []string   `json:"recipients"` // List of JIDs/chat IDs
-	Status         string     `json:"status"`     // pending, sending, completed, failed
-	TotalRecipients int       `json:"total_recipients"`
-	SentCount      int        `json:"sent_count"`
-	FailedCount    int        `json:"failed_count"`
-	ScheduledAt    *time.Time `json:"scheduled_at,omitempty"`
-	StartedAt      *time.Time `json:"started_at,omitempty"`
-	CompletedAt    *time.Time `json:"completed_at,omitempty"`
-	CreatedAt      time.Time  `json:"created_at"`
+	ID              string     `json:"id"`
+	AgentID         string     `json:"agent_id"`
+	IntegrationType string     `json:"integration_type"` // whatsapp, telegram, etc.
+	Message         string     `json:"message"`
+	MediaURL        string     `json:"media_url,omitempty"`
+	Recipients      []string   `json:"recipients"` // List of JIDs/chat IDs
+	Status          string     `json:"status"`     // pending, sending, completed, failed
+	TotalRecipients int        `json:"total_recipients"`
+	SentCount       int        `json:"sent_count"`
+	FailedCount     int        `json:"failed_count"`
+	ScheduledAt     *time.Time `json:"scheduled_at,omitempty"`
+	StartedAt       *time.Time `json:"started_at,omitempty"`
+	CompletedAt     *time.Time `json:"completed_at,omitempty"`
+	CreatedAt       time.Time  `json:"created_at"`
 }
 
 // CreateBroadcastRequest represents request to create a broadcast
@@ -93,7 +93,7 @@ type CreateBroadcastRequest struct {
 type ISettingsRepository interface {
 	GetAgentSettings(ctx context.Context, agentID string) (*AgentSettings, error)
 	SaveAgentSettings(ctx context.Context, settings *AgentSettings) error
-	
+
 	CreateBroadcast(ctx context.Context, broadcast *BroadcastMessage) error
 	GetBroadcast(ctx context.Context, id string) (*BroadcastMessage, error)
 	GetBroadcastsByAgentID(ctx context.Context, agentID string) ([]*BroadcastMessage, error)
@@ -105,10 +105,11 @@ type ISettingsService interface {
 	GetAgentSettings(ctx context.Context, agentID string) (*AgentSettings, error)
 	UpdateAgentSettings(ctx context.Context, settings *AgentSettings) error
 	IsWithinWorkingHours(ctx context.Context, agentID string) (bool, string, error)
-	
+
 	CreateBroadcast(ctx context.Context, req CreateBroadcastRequest) (*BroadcastMessage, error)
 	GetBroadcasts(ctx context.Context, agentID string) ([]*BroadcastMessage, error)
-	ExecuteBroadcast(ctx context.Context, id string) error
+	GetBroadcast(ctx context.Context, id string) (*BroadcastMessage, error)
+	UpdateBroadcastStatus(ctx context.Context, id string, status string, sentCount, failedCount int) error
 }
 
 // DefaultAgentSettings returns default settings for a new agent
@@ -158,7 +159,3 @@ func DefaultAgentSettings(agentID string) *AgentSettings {
 		UpdatedAt:       time.Now(),
 	}
 }
-
-
-
-
