@@ -16,7 +16,10 @@ import (
 )
 
 func handleMessage(ctx context.Context, evt *events.Message, chatStorageRepo domainChatStorage.IChatStorageRepository, client *whatsmeow.Client) {
-	// Log message metadata
+	// Log message metadata with explicit logrus to ensure visibility
+	logrus.Infof("📩 [WhatsApp] handleMessage called - from: %s, chat: %s, isFromMe: %v",
+		evt.Info.Sender.String(), evt.Info.Chat.String(), evt.Info.IsFromMe)
+
 	metaParts := buildMessageMetaParts(evt)
 	log.Infof("Received message %s from %s (%s): %+v",
 		evt.Info.ID,
@@ -40,7 +43,7 @@ func handleMessage(ctx context.Context, evt *events.Message, chatStorageRepo dom
 	if handler := GetAgentHandler(); handler != nil {
 		handler.HandleIncomingMessage(ctx, evt, chatStorageRepo, client)
 	}
-	
+
 	// Handle legacy AI chatbot if enabled (takes precedence over auto-reply)
 	if config.AIChatbotEnabled {
 		handleAIChatbot(ctx, evt, chatStorageRepo, client)

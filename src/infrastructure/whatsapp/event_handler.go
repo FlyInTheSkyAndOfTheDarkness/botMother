@@ -44,6 +44,7 @@ func handler(ctx context.Context, instance *DeviceInstance, rawEvt any) {
 	case *events.StreamReplaced:
 		handleStreamReplaced(ctx)
 	case *events.Message:
+		logrus.Infof("📨 [WhatsApp] Message event received - ID: %s, From: %s", evt.Info.ID, evt.Info.Sender.String())
 		handleMessage(ctx, evt, chatStorageRepo, client)
 	case *events.Receipt:
 		handleReceipt(ctx, evt, instance.JID(), client)
