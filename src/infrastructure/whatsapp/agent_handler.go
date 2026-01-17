@@ -92,11 +92,20 @@ func (h *AgentMessageHandler) HandleIncomingMessage(
 		deviceJIDNonAD = client.Store.ID.ToNonAD().String()
 	}
 
-	// Get the DeviceID (UUID) for this client from DeviceManager
-	// This is critical for matching with agent integrations which store DeviceID
-	deviceManager := GetDeviceManager()
-	if deviceManager != nil {
-		currentDeviceID = deviceManager.GetDeviceIDByClient(client)
+	// Get the DeviceID (UUID) from context - this is set by event_handler.go
+	// This is the most reliable way to get the DeviceID that matches agent integration config
+	if deviceInst, ok := DeviceFromContext(ctx); ok && deviceInst != nil {
+		currentDeviceID = deviceInst.ID()
+		logrus.Debugf("📱 [WhatsApp Agent] Got DeviceID from context: %s", currentDeviceID)
+	}
+
+	// Fallback to DeviceManager if context didn't have device
+	if currentDeviceID == "" {
+		deviceManager := GetDeviceManager()
+		if deviceManager != nil {
+			currentDeviceID = deviceManager.GetDeviceIDByClient(client)
+			logrus.Debugf("📱 [WhatsApp Agent] Got DeviceID from DeviceManager: %s", currentDeviceID)
+		}
 	}
 
 	// Find agents with active WhatsApp integrations matching this device
