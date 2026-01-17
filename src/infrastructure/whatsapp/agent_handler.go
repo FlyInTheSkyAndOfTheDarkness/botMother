@@ -8,9 +8,9 @@ import (
 
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/config"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/domains/agent"
+	domainChatStorage "github.com/aldinokemal/go-whatsapp-web-multidevice/domains/chatstorage"
 	agentRepo "github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/agent"
 	aiService "github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/ai"
-	domainChatStorage "github.com/aldinokemal/go-whatsapp-web-multidevice/domains/chatstorage"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/pkg/utils"
 	"github.com/sirupsen/logrus"
 	"go.mau.fi/whatsmeow"
@@ -86,9 +86,17 @@ func (h *AgentMessageHandler) HandleIncomingMessage(
 	// Get current device JID to find matching integration
 	deviceJID := ""
 	deviceJIDNonAD := ""
+	currentDeviceID := ""
 	if client.Store.ID != nil {
 		deviceJID = client.Store.ID.String()
 		deviceJIDNonAD = client.Store.ID.ToNonAD().String()
+	}
+
+	// Get the DeviceID (UUID) for this client from DeviceManager
+	// This is critical for matching with agent integrations which store DeviceID
+	deviceManager := GetDeviceManager()
+	if deviceManager != nil {
+		currentDeviceID = deviceManager.GetDeviceIDByClient(client)
 	}
 
 	// Find agents with active WhatsApp integrations matching this device
@@ -99,7 +107,7 @@ func (h *AgentMessageHandler) HandleIncomingMessage(
 	}
 
 	remoteJID := evt.Info.Sender.String()
-	logrus.Infof("📱 [WhatsApp Agent] Processing message from %s (device: %s), found %d agents", remoteJID, deviceJID, len(agents))
+	logrus.Infof("📱 [WhatsApp Agent] Processing message from %s (device JID: %s, device ID: %s), found %d agents", remoteJID, deviceJID, currentDeviceID, len(agents))
 
 	foundAgent := false
 	for _, ag := range agents {
@@ -125,39 +133,39 @@ func (h *AgentMessageHandler) HandleIncomingMessage(
 			if integration.Type != agent.IntegrationTypeWhatsApp {
 				continue
 			}
-			
+
 			if !integration.IsConnected {
 				logrus.Debugf("⏭️  [WhatsApp Agent] Integration %s not connected", integration.ID)
 				continue
 			}
 
-				logrus.Infof("🔍 [WhatsApp Agent] Checking WhatsApp integration %s (connected: %v)", integration.ID, integration.IsConnected)
-			
+			logrus.Infof("🔍 [WhatsApp Agent] Checking WhatsApp integration %s (connected: %v)", integration.ID, integration.IsConnected)
+
 			// Parse WhatsApp config
 			waConfig, err := agentRepo.ParseWhatsAppConfig(integration.Config)
 			if err != nil {
 				logrus.Warnf("⚠️  [WhatsApp Agent] Failed to parse WhatsApp config for integration %s: %v", integration.ID, err)
 				continue
 			}
-			
+
 			if waConfig == nil {
 				logrus.Debugf("📱 [WhatsApp Agent] Integration %s has no config", integration.ID)
 				// If no config, skip this integration (safety)
 				continue
 			}
-			
-			// Try to match by DeviceID first
+
+			// Try to match by DeviceID first (UUID comparison)
 			matched := false
-			if waConfig.DeviceID != "" {
-				// Match by DeviceID (exact match)
-				if waConfig.DeviceID == deviceJID || waConfig.DeviceID == deviceJIDNonAD {
+			if waConfig.DeviceID != "" && currentDeviceID != "" {
+				// Match by DeviceID (UUID exact match)
+				if waConfig.DeviceID == currentDeviceID {
 					matched = true
 					logrus.Infof("✅ [WhatsApp Agent] Matched integration %s by DeviceID: %s", integration.ID, waConfig.DeviceID)
 				} else {
-					logrus.Debugf("📱 [WhatsApp Agent] DeviceID mismatch: config=%s, current=%s/%s", waConfig.DeviceID, deviceJID, deviceJIDNonAD)
+					logrus.Debugf("📱 [WhatsApp Agent] DeviceID mismatch: config=%s, current=%s", waConfig.DeviceID, currentDeviceID)
 				}
 			}
-			
+
 			// If DeviceID didn't match, try JID
 			if !matched && waConfig.JID != "" {
 				// Match by JID (exact match)
@@ -168,7 +176,7 @@ func (h *AgentMessageHandler) HandleIncomingMessage(
 					logrus.Debugf("📱 [WhatsApp Agent] JID mismatch: config=%s, current=%s/%s", waConfig.JID, deviceJID, deviceJIDNonAD)
 				}
 			}
-			
+
 			// If still no match, try to find device by DeviceID/JID in DeviceManager
 			if !matched && (waConfig.DeviceID != "" || waConfig.JID != "") {
 				deviceManager := GetDeviceManager()
@@ -183,7 +191,7 @@ func (h *AgentMessageHandler) HandleIncomingMessage(
 							}
 						}
 					}
-					
+
 					// Try to find device by JID
 					if !matched && waConfig.JID != "" {
 						// Search all devices for matching JID
@@ -197,13 +205,13 @@ func (h *AgentMessageHandler) HandleIncomingMessage(
 					}
 				}
 			}
-			
+
 			// If no DeviceID or JID configured, skip this integration (safety - don't use random integration)
 			if !matched && waConfig.DeviceID == "" && waConfig.JID == "" {
 				logrus.Warnf("⚠️  [WhatsApp Agent] Integration %s has no DeviceID or JID configured - skipping for safety", integration.ID)
 				continue
 			}
-			
+
 			if matched {
 				matchingIntegration = integration
 				logrus.Infof("✅ [WhatsApp Agent] Found matching integration %s for device %s", integration.ID, deviceJID)
@@ -294,7 +302,7 @@ func (h *AgentMessageHandler) processMessageForAgent(
 	client *whatsmeow.Client,
 ) {
 	logrus.Infof("🤖 [WhatsApp Agent] Processing message for agent %s (%s): %s", ag.ID, ag.Name, userMessage[:min(50, len(userMessage))])
-	
+
 	// Create AI service with agent's API key
 	aiSvc := aiService.NewService(ag.APIKey, ag.SerpAPIKey)
 	if aiSvc == nil {
@@ -379,24 +387,24 @@ func (h *AgentMessageHandler) processMessageForAgent(
 		}
 
 		response, err = aiSvc.GenerateResponse(ctx, finalPrompt, ag.SystemPrompt, ag.Model, 500, 0.7)
-	if err != nil {
-		logrus.Errorf("❌ [WhatsApp Agent] Failed to generate AI response for agent %s: %v", ag.ID, err)
+		if err != nil {
+			logrus.Errorf("❌ [WhatsApp Agent] Failed to generate AI response for agent %s: %v", ag.ID, err)
+			return
+		}
+
+		// Mark conversation as having had first reply
+		if !conv.IsFirstReply {
+			conv.IsFirstReply = true
+			h.agentRepo.UpdateConversation(ctx, conv)
+		}
+	}
+
+	if response == "" {
+		logrus.Warnf("⚠️  [WhatsApp Agent] Agent %s: AI returned empty response", ag.ID)
 		return
 	}
 
-	// Mark conversation as having had first reply
-	if !conv.IsFirstReply {
-		conv.IsFirstReply = true
-		h.agentRepo.UpdateConversation(ctx, conv)
-	}
-}
-
-if response == "" {
-	logrus.Warnf("⚠️  [WhatsApp Agent] Agent %s: AI returned empty response", ag.ID)
-	return
-}
-
-logrus.Infof("💡 [WhatsApp Agent] AI response generated for agent %s: %s", ag.ID, response[:min(100, len(response))])
+	logrus.Infof("💡 [WhatsApp Agent] AI response generated for agent %s: %s", ag.ID, response[:min(100, len(response))])
 
 	// Store assistant response
 	assistantMsg := &agent.Message{
@@ -451,4 +459,3 @@ func min(a, b int) int {
 	}
 	return b
 }
-

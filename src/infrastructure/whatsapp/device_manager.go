@@ -89,6 +89,26 @@ func (m *DeviceManager) DefaultDevice() *DeviceInstance {
 	return nil
 }
 
+// GetDeviceIDByClient finds a device ID by matching the given WhatsApp client instance.
+// This is useful for agent message handling where we have the client but need to find
+// which DeviceID (UUID) it corresponds to.
+func (m *DeviceManager) GetDeviceIDByClient(client *whatsmeow.Client) string {
+	if m == nil || client == nil {
+		return ""
+	}
+
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	for deviceID, inst := range m.devices {
+		if inst.GetClient() == client {
+			return deviceID
+		}
+	}
+
+	return ""
+}
+
 // ResolveDevice attempts to locate a device by ID or falls back to the default/only device.
 // It returns the resolved instance, the ID used, or an error when no suitable device is found.
 func (m *DeviceManager) ResolveDevice(deviceID string) (*DeviceInstance, string, error) {
