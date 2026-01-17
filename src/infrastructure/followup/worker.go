@@ -247,10 +247,10 @@ func (w *FollowUpWorker) isFollowUpMessage(content string, keywords []string) bo
 }
 
 // sendFollowUpMessage sends a follow-up message
-func (w *FollowUpWorker) sendFollowUpMessage(ctx context.Context, agent *agent.Agent, conv *agent.Conversation, settings *settings.AgentSettings) {
+func (w *FollowUpWorker) sendFollowUpMessage(ctx context.Context, ag *agent.Agent, conv *agent.Conversation, settings *settings.AgentSettings) {
 	// Get follow-up message template
 	if len(settings.FollowUp.Messages) == 0 {
-		logrus.Warnf("⚠️  Follow-up worker: No follow-up messages configured for agent %s", agent.ID)
+		logrus.Warnf("⚠️  Follow-up worker: No follow-up messages configured for agent %s", ag.ID)
 		return
 	}
 
