@@ -167,8 +167,50 @@ func (r *SQLiteRepository) Update(ctx context.Context, a *agent.Agent) error {
 }
 
 func (r *SQLiteRepository) Delete(ctx context.Context, id string) error {
-	_, err := r.db.ExecContext(ctx, `DELETE FROM agents WHERE id = ?`, id)
-	return err
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	// 1. Delete all messages associated with conversations of this agent
+	_, err = tx.ExecContext(ctx, `
+		DELETE FROM messages 
+		WHERE conversation_id IN (
+			SELECT id FROM conversations WHERE agent_id = ?
+		)
+	`, id)
+	if err != nil {
+		return fmt.Errorf("failed to delete agent messages: %w", err)
+	}
+
+	// 2. Delete conversations
+	_, err = tx.ExecContext(ctx, `DELETE FROM conversations WHERE agent_id = ?`, id)
+	if err != nil {
+		return fmt.Errorf("failed to delete agent conversations: %w", err)
+	}
+
+	// 3. Delete integrations
+	_, err = tx.ExecContext(ctx, `DELETE FROM integrations WHERE agent_id = ?`, id)
+	if err != nil {
+		return fmt.Errorf("failed to delete agent integrations: %w", err)
+	}
+
+	// 4. Delete the agent
+	result, err := tx.ExecContext(ctx, `DELETE FROM agents WHERE id = ?`, id)
+	if err != nil {
+		return fmt.Errorf("failed to delete agent: %w", err)
+	}
+
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if rows == 0 {
+		return fmt.Errorf("agent not found")
+	}
+
+	return tx.Commit()
 }
 
 // Integration CRUD
@@ -464,4 +506,3 @@ func ParseInstagramConfig(configJSON string) (*agent.InstagramConfig, error) {
 	}
 	return &config, nil
 }
-

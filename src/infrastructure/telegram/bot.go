@@ -23,11 +23,38 @@ type TelegramUpdate struct {
 
 // TelegramMessage represents a Telegram message
 type TelegramMessage struct {
-	MessageID int           `json:"message_id"`
-	From      *TelegramUser `json:"from,omitempty"`
-	Chat      *TelegramChat `json:"chat"`
-	Date      int           `json:"date"`
-	Text      string        `json:"text,omitempty"`
+	MessageID int            `json:"message_id"`
+	From      *TelegramUser  `json:"from,omitempty"`
+	Chat      *TelegramChat  `json:"chat"`
+	Date      int            `json:"date"`
+	Text      string         `json:"text,omitempty"`
+	Voice     *TelegramVoice `json:"voice,omitempty"`
+	Audio     *TelegramAudio `json:"audio,omitempty"`
+}
+
+type TelegramVoice struct {
+	FileID   string `json:"file_id"`
+	Duration int    `json:"duration"`
+	MimeType string `json:"mime_type"`
+	FileSize int64  `json:"file_size"`
+}
+
+type TelegramAudio struct {
+	FileID   string `json:"file_id"`
+	Duration int    `json:"duration"`
+	MimeType string `json:"mime_type"`
+	FileSize int64  `json:"file_size"`
+}
+
+// TelegramFileResponse represents response from getFile
+type TelegramFileResponse struct {
+	Ok     bool         `json:"ok"`
+	Result TelegramFile `json:"result"`
+}
+
+type TelegramFile struct {
+	FileID   string `json:"file_id"`
+	FilePath string `json:"file_path"`
 }
 
 // TelegramUser represents a Telegram user
@@ -192,7 +219,7 @@ func (b *TelegramBot) Start() {
 		return
 	}
 	defer resp.Body.Close()
-	
+
 	body, _ := io.ReadAll(resp.Body)
 	var meResult struct {
 		OK     bool `json:"ok"`
@@ -202,12 +229,12 @@ func (b *TelegramBot) Start() {
 		Description string `json:"description"`
 	}
 	json.Unmarshal(body, &meResult)
-	
+
 	if !meResult.OK {
 		logrus.Errorf("❌ Telegram bot auth failed: %s", meResult.Description)
 		return
 	}
-	
+
 	logrus.Infof("✅ Telegram bot @%s connected successfully!", meResult.Result.Username)
 
 	offset := 0
@@ -253,7 +280,7 @@ func (b *TelegramBot) Stop() {
 
 func (b *TelegramBot) getUpdates(offset int) ([]TelegramUpdate, error) {
 	url := fmt.Sprintf("https://api.telegram.org/bot%s/getUpdates?offset=%d&timeout=30", b.Token, offset)
-	
+
 	client := &http.Client{Timeout: 35 * time.Second}
 	resp, err := client.Get(url)
 	if err != nil {
@@ -285,7 +312,12 @@ func (b *TelegramBot) getUpdates(offset int) ([]TelegramUpdate, error) {
 }
 
 func (b *TelegramBot) handleUpdate(update TelegramUpdate) {
-	if update.Message == nil || update.Message.Text == "" {
+	if update.Message == nil {
+		return
+	}
+
+	// Skip updates without content we can handle
+	if update.Message.Text == "" && update.Message.Voice == nil && update.Message.Audio == nil {
 		return
 	}
 
@@ -298,7 +330,7 @@ func (b *TelegramBot) handleUpdate(update TelegramUpdate) {
 	b.mu.Unlock()
 
 	msg := update.Message
-	
+
 	// Safety checks
 	if msg.Chat == nil {
 		logrus.Warn("Telegram message has no chat info")
@@ -308,10 +340,61 @@ func (b *TelegramBot) handleUpdate(update TelegramUpdate) {
 		logrus.Warn("Telegram message has no sender info")
 		return
 	}
-	
+
 	chatID := msg.Chat.ID
 	userMessage := msg.Text
 	userID := fmt.Sprintf("tg_%d", msg.From.ID)
+
+	// Handle Voice/Audio messages
+	var fileID string
+	if msg.Voice != nil {
+		fileID = msg.Voice.FileID
+		logrus.Infof("🎤 [Telegram] Voice message received: %s (duration: %d)", fileID, msg.Voice.Duration)
+	} else if msg.Audio != nil {
+		fileID = msg.Audio.FileID
+		logrus.Infof("🎵 [Telegram] Audio message received: %s", fileID)
+	}
+
+	// If we have an audio file, try to transcribe it
+	if fileID != "" {
+		// We need to get the agent first to get the API key for transcription
+		ctx := context.Background()
+		agentData, err := agentSvc.GetAgentInternal(ctx, agentID)
+		if err != nil {
+			logrus.Errorf("❌ [Telegram] Failed to get agent data for transcription: %v", err)
+		} else {
+			// Get file info from Telegram
+			fileInfo, err := b.getFile(fileID)
+			if err != nil {
+				logrus.Errorf("❌ [Telegram] Failed to get file info: %v", err)
+			} else {
+				// Download file bytes
+				fileBytes, err := b.downloadFile(fileInfo.FilePath)
+				if err != nil {
+					logrus.Errorf("❌ [Telegram] Failed to download audio file: %v", err)
+				} else {
+					// Create AI service with agent's key
+					aiSvc := aiService.NewService(agentData.APIKey, agentData.SerpAPIKey)
+
+					// Transcribe
+					logrus.Infof("speech-to-text: transcribing %s...", fileID)
+					transcription, err := aiSvc.TranscribeAudioFromBytes(ctx, fileBytes, "voice.ogg")
+					if err != nil {
+						logrus.Errorf("❌ [Telegram] Transcription failed: %v", err)
+					} else {
+						logrus.Infof("✅ [Telegram] Transcription result: %s", transcription)
+						// Update text so the agent processes it as a text message
+						userMessage = fmt.Sprintf("[Voice Transcription] %s", transcription)
+					}
+				}
+			}
+		}
+	}
+
+	if userMessage == "" {
+		// If text is still empty (no text and no transcription), skip
+		return
+	}
 
 	logrus.Infof("📱 [Telegram] Message from %s (chat %d): %s", userID, chatID, userMessage)
 
@@ -335,7 +418,7 @@ func (b *TelegramBot) handleUpdate(update TelegramUpdate) {
 		logrus.Warnf("⚠️  [Telegram] AI returned empty response for agent %s (manual mode or error)", agentID)
 		return
 	}
-	
+
 	logrus.Infof("💡 [Telegram] AI response generated for agent %s: %s", agentID, response[:min(50, len(response))])
 
 	// Send response using captured token
@@ -347,6 +430,45 @@ func (b *TelegramBot) handleUpdate(update TelegramUpdate) {
 	}
 }
 
+func (b *TelegramBot) getFile(fileID string) (*TelegramFile, error) {
+	url := fmt.Sprintf("https://api.telegram.org/bot%s/getFile?file_id=%s", b.Token, fileID)
+	resp, err := http.Get(url)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("getFile error status: %d", resp.StatusCode)
+	}
+
+	var result TelegramFileResponse
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, err
+	}
+
+	if !result.Ok {
+		return nil, fmt.Errorf("telegram API error getting file info")
+	}
+
+	return &result.Result, nil
+}
+
+func (b *TelegramBot) downloadFile(filePath string) ([]byte, error) {
+	url := fmt.Sprintf("https://api.telegram.org/file/bot%s/%s", b.Token, filePath)
+	resp, err := http.Get(url)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("downloadFile error status: %d", resp.StatusCode)
+	}
+
+	return io.ReadAll(resp.Body)
+}
+
 // sendTelegramMessage sends a message using given token (thread-safe)
 func sendTelegramMessage(token string, chatID int64, text string) error {
 	return SendMessageDirect(token, chatID, text)
@@ -355,7 +477,7 @@ func sendTelegramMessage(token string, chatID int64, text string) error {
 // SendMessageDirect sends a message directly via Telegram API (exported for use by other packages)
 func SendMessageDirect(token string, chatID int64, text string) error {
 	url := fmt.Sprintf("https://api.telegram.org/bot%s/sendMessage", token)
-	
+
 	payload := map[string]interface{}{
 		"chat_id": chatID,
 		"text":    text,
@@ -421,4 +543,3 @@ func min(a, b int) int {
 	}
 	return b
 }
-
