@@ -64,8 +64,11 @@ func (h *AgentMessageHandler) HandleIncomingMessage(
 		return
 	}
 
-	// Only reply to direct 1:1 chats
-	if evt.Info.Chat.Server != types.DefaultUserServer {
+	// Only reply to direct 1:1 chats (allow both standard JID and LID formats)
+	// LID = Local ID, a new WhatsApp format for some users/messages
+	chatServer := evt.Info.Chat.Server
+	if chatServer != types.DefaultUserServer && chatServer != "lid" {
+		logrus.Debugf("⏭️ [WhatsApp Agent] Skipping message with server: %s (not user or lid)", chatServer)
 		return
 	}
 
