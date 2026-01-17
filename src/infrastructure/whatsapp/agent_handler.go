@@ -96,7 +96,7 @@ func (h *AgentMessageHandler) HandleIncomingMessage(
 	// This is the most reliable way to get the DeviceID that matches agent integration config
 	if deviceInst, ok := DeviceFromContext(ctx); ok && deviceInst != nil {
 		currentDeviceID = deviceInst.ID()
-		logrus.Debugf("📱 [WhatsApp Agent] Got DeviceID from context: %s", currentDeviceID)
+		logrus.Infof("📱 [WhatsApp Agent] Got DeviceID from context: %s", currentDeviceID)
 	}
 
 	// Fallback to DeviceManager if context didn't have device
@@ -104,7 +104,7 @@ func (h *AgentMessageHandler) HandleIncomingMessage(
 		deviceManager := GetDeviceManager()
 		if deviceManager != nil {
 			currentDeviceID = deviceManager.GetDeviceIDByClient(client)
-			logrus.Debugf("📱 [WhatsApp Agent] Got DeviceID from DeviceManager: %s", currentDeviceID)
+			logrus.Infof("📱 [WhatsApp Agent] Got DeviceID from DeviceManager: %s", currentDeviceID)
 		}
 	}
 
@@ -165,13 +165,14 @@ func (h *AgentMessageHandler) HandleIncomingMessage(
 
 			// Try to match by DeviceID first (UUID comparison)
 			matched := false
+			logrus.Infof("🔍 [WhatsApp Agent] Comparing DeviceIDs: config=%s vs current=%s", waConfig.DeviceID, currentDeviceID)
 			if waConfig.DeviceID != "" && currentDeviceID != "" {
 				// Match by DeviceID (UUID exact match)
 				if waConfig.DeviceID == currentDeviceID {
 					matched = true
 					logrus.Infof("✅ [WhatsApp Agent] Matched integration %s by DeviceID: %s", integration.ID, waConfig.DeviceID)
 				} else {
-					logrus.Debugf("📱 [WhatsApp Agent] DeviceID mismatch: config=%s, current=%s", waConfig.DeviceID, currentDeviceID)
+					logrus.Warnf("⚠️  [WhatsApp Agent] DeviceID mismatch: config=%s, current=%s", waConfig.DeviceID, currentDeviceID)
 				}
 			}
 
