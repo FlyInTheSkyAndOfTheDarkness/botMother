@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/domains/agent"
+	aiService "github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/ai"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/usecase"
 	"github.com/sirupsen/logrus"
 )
